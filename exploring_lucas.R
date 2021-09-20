@@ -17,9 +17,11 @@ library(PreSPickR)
 
 
 if(Sys.info()[4] == "D01RI1700308") {
-        wd <- "D:/xavi_rp/D5_FFGRCC_gbif_occ/"
+  wd <- "D:/xavi_rp/D5_FFGRCC_gbif_occ/"
+}else if(Sys.info()[4] == "S-JRCIPRAP320P") {
+  wd <- "D:/rotllxa/D5_FFGRCC_gbif_occ/"
 }else{
-        wd <- "C:/Users/rotllxa/D5_FFGRCC_occurrences/"
+  wd <- "C:/Users/rotllxa/D5_FFGRCC_occurrences/"
 }
 
 setwd(wd)
@@ -794,11 +796,129 @@ plot(occs_lucas_200_cat)
 
 library(sf)
 
-Natura2000_end2020_epsg3035 <- st_read("D:/xavi_rp/D5_FFGRCC_gbif_occ/Natura2000_end2020_shp/Natura2000_end2020_epsg3035.shp")
+Natura2000_end2020_epsg3035 <- st_read("Natura2000_end2020_shp/Natura2000_end2020_epsg3035.shp")
 Natura2000_end2020_epsg3035
 
+names(Natura2000_end2020_epsg3035)
 
 
+natura2000_csv <- list.files("Natura2000_end2020_csv", full.names = TRUE)
+
+for (i in 9:length(natura2000_csv)){
+  print(i)
+  print(natura2000_csv[i])
+  print(names(read.csv(natura2000_csv[i], header = TRUE)))
+  print("")
+}
+
+
+
+## Habitats ("...HABITATCLASS.csv")
+i <- 4
+natura2000_csv_n4 <- read.csv(natura2000_csv[i], header = TRUE)
+head(natura2000_csv_n4)
+
+View(natura2000_csv_n4[natura2000_csv_n4$SITECODE == "CZ0523284", ])
+sum(natura2000_csv_n4[natura2000_csv_n4$SITECODE == "CZ0523284", 4])
+length(natura2000_csv_n4$SITECODE)
+
+sort(unique(natura2000_csv_n4$HABITATCODE))
+# [1] "N01" "N02" "N03" "N04" "N05" "N06" "N07" "N08" "N09" "N10" "N11" "N12" "N13" "N14" "N15"
+#[16] "N16" "N17" "N18" "N19" "N20" "N21" "N22" "N23" "N24" "N25" "N26" "N27" "N6"  "N9" 
+
+
+head(natura2000_csv_n4[natura2000_csv_n4$HABITATCODE == "N9", ], 10)
+sum(natura2000_csv_n4$HABITATCODE == "N9")                             # N9 only one case, seems an error
+head(natura2000_csv_n4[natura2000_csv_n4$HABITATCODE == "N09", ], 10)
+sum(natura2000_csv_n4$HABITATCODE == "N09")
+head(natura2000_csv_n4[natura2000_csv_n4$HABITATCODE == "N6", ], 10)    # N6 only one case, seems an error (same SITECODE)
+
+
+
+## Habitats ("...HABITATS.csv")
+i <- 5
+natura2000_csv_n5 <- read.csv(natura2000_csv[i], header = TRUE)
+head(natura2000_csv_n5)
+names(natura2000_csv_n5)  
+nrow(natura2000_csv_n5) # 151305
+nrow(natura2000_csv_n4) # 139499
+
+sort(unique(natura2000_csv_n5$HABITATCODE))
+length(unique(natura2000_csv_n5$HABITATCODE))  # 237 classes, different from previous csv
+                                               # share of each habitat is not provided, only the area
+
+
+length(natura2000_csv_n5$ï..SITECODE)
+head(natura2000_csv_n5$ï..SITECODE)
+nrow(natura2000_csv_n5[natura2000_csv_n5$ï..SITECODE == "CZ0523284", ])
+
+sum(!natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$ï..SITECODE)  # 24000 
+sum(!natura2000_csv_n5$ï..SITECODE %in% natura2000_csv_n4$SITECODE)  #  1208
+
+natura2000_csv_n5[natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$ï..SITECODE, ][100000, ]
+View(head(natura2000_csv_n5[natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$ï..SITECODE, ], 50))
+View((natura2000_csv_n4[natura2000_csv_n4$SITECODE == "ES0000067", ]))
+View((natura2000_csv_n5[natura2000_csv_n5$ï..SITECODE == "ES0000067", ]))
+sum(natura2000_csv_n5[natura2000_csv_n5$ï..SITECODE == "ES0000067", "COVER_HA"])   # 62253.97
+
+
+
+## Habitats ("...NATURA2000SITES.csv")
+i <- 9
+natura2000_csv_n9 <- read.csv(natura2000_csv[i], header = TRUE)
+head(natura2000_csv_n9)
+names(natura2000_csv_n9)  
+nrow(natura2000_csv_n9)  
+
+natura2000_csv_n9[natura2000_csv_n9$SITECODE == "ES0000067", ]
+head(natura2000_csv_n9$SITECODE)
+
+
+
+
+## Habitats ("...IMPACT.csv")
+i <- 6
+natura2000_csv_n6 <- read.csv(natura2000_csv[i], header = TRUE)
+head(natura2000_csv_n6)
+nrow(natura2000_csv_n6)
+
+unique(natura2000_csv_n6$POLLUTIONCODE)
+unique(natura2000_csv_n6$DESCRIPTION)
+unique(natura2000_csv_n6$IMPACT_TYPE)
+unique(natura2000_csv_n6$IMPACTCODE)
+
+
+
+
+
+## Habitats ("...SPECIES.csv")
+i <- 11
+natura2000_csv_n11 <- read.csv(natura2000_csv[i], header = TRUE)
+head(natura2000_csv_n11)
+names(natura2000_csv_n11)
+nrow(natura2000_csv_n11)
+
+length(unique(natura2000_csv_n11$SITECODE))
+
+View(natura2000_csv_n11[natura2000_csv_n11$SITECODE == "ES0000067", ])
+
+
+unique(natura2000_csv_n11$SPGROUP)
+nrow(natura2000_csv_n11[natura2000_csv_n11$SPGROUP == "Plants", ])
+View(head(natura2000_csv_n11[natura2000_csv_n11$SPGROUP == "Plants", ]))
+View((natura2000_csv_n11[natura2000_csv_n11$SPGROUP == "Plants", ]))
+
+nrow(natura2000_csv_n11[natura2000_csv_n11$SPGROUP == "", ])
+View((natura2000_csv_n11[natura2000_csv_n11$SPGROUP == "", ]))
+
+
+
+## Habitats ("...OTHERSPECIES.csv")
+i <- 10
+natura2000_csv_n10 <- read.csv(natura2000_csv[i], header = TRUE)
+View(head(natura2000_csv_n10, 50))
+names(natura2000_csv_n10)
+nrow(natura2000_csv_n10)
 
 
 
