@@ -20,13 +20,19 @@ if(Sys.info()[4] == "D01RI1700308") {
   wd <- "D:/xavi_rp/D5_FFGRCC_gbif_occ/"
 }else if(Sys.info()[4] == "S-JRCIPRAP320P") {
   wd <- "D:/rotllxa/D5_FFGRCC_gbif_occ/"
+}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03")) {
+  if(!dir.exists("/eos/jeodpp/home/users/rotllxa/exploring_lucas_data/")) 
+    dir.create("/eos/jeodpp/home/users/rotllxa/exploring_lucas_data/")
+  wd <- "/eos/jeodpp/home/users/rotllxa/exploring_lucas_data/"
+  gbif_creds <- "/home/rotllxa/Documents/"
 }else{
   wd <- "C:/Users/rotllxa/D5_FFGRCC_occurrences/"
+  gbif_creds <- "C:/Users/rotllxa/Documents/"
 }
 
 setwd(wd)
 
-
+# file.edit('~/.Renviron')
 
 ## Preliminary checks (GBIF - rgbif) ####
 
@@ -75,7 +81,7 @@ write.table(clss, "list_taxons.csv", sep = ", ", row.names = FALSE, col.names = 
 
 t0 <- Sys.time()
 
-GetBIF(credentials = "C:/Users/rotllxa/Documents/gbif_credentials.RData",
+GetBIF(credentials = paste0(gbif_creds, "/gbif_credentials.RData"),
        taxon_list = clss$clss,
        #taxon_list = "Chaenorhinum",
        #taxon_list = "Ophrys",
@@ -95,24 +101,28 @@ GetBIF(credentials = "C:/Users/rotllxa/Documents/gbif_credentials.RData",
                      #"ownerInstitutionCode",
                      "datasetKey"
                      ),
-       out_name = paste0("D:/xavi_rp/D5_FFGRCC_gbif_occ/", "sp_records_", format(Sys.Date(), "%Y%m%d")))
+       out_name = paste0("/D5_FFGRCC_gbif_occ/", "sp_records_", format(Sys.Date(), "%Y%m%d")))
 
 Sys.time() - t0
 
 
 
+
 ## Checking results ####
 
-setwd("D:/xavi_rp/D5_FFGRCC_gbif_occ/")
+setwd(paste0(getwd(), "/D5_FFGRCC_gbif_occ/"))
 
 ## If the download was saved as csv with PreSPickR
 #occs_all <- read.csv("sp_records_20210709.csv", header = TRUE)
-occs_all <- fread("sp_records_20210709.csv", header = TRUE)
+occs_all <- fread("D5_FFGRCC_gbif_occ/sp_records_20210709.csv", header = TRUE)
+#occs_all <- fread("sp_records_20211004_jeodpp_kk.csv", header = TRUE)
 
 ## To retrieve the raw data downloaded with PreSPickR::Pres_BIF()
 ## and create the simpler csv
+## This doesn't work in Jeo-Desk... see below for a manual approach
 
 taxon_dir <- "D:/xavi_rp/D5_FFGRCC_gbif_occ/"
+taxon_dir <- "/eos/jeodpp/home/users/rotllxa/exploring_lucas_data"
 taxons <- clss$clss
 data1 <- Prep_BIF(taxon_dir = paste0(taxon_dir, "/"),
                   taxons = taxons,
@@ -134,9 +144,69 @@ write.csv(data1, file = paste0("sp_records_20210709", ".csv"),
 #occs_all <- fread("sp_records_20210709.csv", header = TRUE)
 
 
+
+## manual approach to retrieve data
+
+zips <- list.files()[grepl(".zip", list.files())]
+data1 <- data.frame()
+
+#for (z in zips[5]){
+for (z in zips){
+  print(paste0("processing... ", z))
+  unzip(z, overwrite = FALSE)
+  z1 <- gsub(".zip", "", z)
+  data02 <- fread(paste0(z1, ".csv"), header = T)
+  print(nrow(data02))
+  data1 <- rbind(data1, data02)
+}
+
+head(data1)
+nrow(data1)
+unique(data1$class)
+names(data1)
+
+
+cols2keep = c("species", "decimalLatitude", "decimalLongitude", #"elevation",
+              "gbifID",
+              "coordinateUncertaintyInMeters",
+              "countryCode", "year", 
+              #"institutionCode",	"collectionCode",
+              #"ownerInstitutionCode",
+              "datasetKey")
+
+
+data1_kk <- data1[, .SD, .SDcols = cols2keep]
+    
+sum(data1_kk$year == 2018)   
+sort(unique(data1_kk$year))
+sort(unique(data1_kk$countryCode))
+length(unique(data1_kk$countryCode))
+
+length(unique(data1_kk$datasetKey))
+
+paste0(unique(data1_kk$datasetKey), collapse = "', '")
+
+
+print(paste0("Saving GBIF data as ", getwd(), "/D5_FFGRCC_gbif_occ/sp_records_20211004", ".csv"))
+write.csv(data1, file = paste0(getwd(), "/D5_FFGRCC_gbif_occ/sp_records_20211004", ".csv"),
+          quote = FALSE, row.names = FALSE)
+#
+
+
+
+names(data1)
+sum(unique(data1$datasetKey) == "7a3679ef-5582-4aaa-81f0-8c2545cafc81")  # Pl@ntNet
+#
+
+
 occs_all <- data1
+occs_all <- fread(paste0(getwd(), "/D5_FFGRCC_gbif_occ/sp_records_20210709.csv"), header = TRUE)
 nrow(occs_all)
 names(occs_all)
+
+
+sort(unique(occs_all$year))
+sum(occs_all$year == 2018)
 
 
 #cols_order <- c("sp2", "species", "decimalLatitude", "decimalLongitude", #"elevation",
@@ -848,18 +918,18 @@ length(unique(natura2000_csv_n5$HABITATCODE))  # 237 classes, different from pre
                                                # share of each habitat is not provided, only the area
 
 
-length(natura2000_csv_n5$ï..SITECODE)
-head(natura2000_csv_n5$ï..SITECODE)
-nrow(natura2000_csv_n5[natura2000_csv_n5$ï..SITECODE == "CZ0523284", ])
+length(natura2000_csv_n5$`?..SITECODE`)
+head(natura2000_csv_n5$`?..SITECODE`)
+nrow(natura2000_csv_n5[natura2000_csv_n5$`?..SITECODE` == "CZ0523284", ])
 
-sum(!natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$ï..SITECODE)  # 24000 
-sum(!natura2000_csv_n5$ï..SITECODE %in% natura2000_csv_n4$SITECODE)  #  1208
+sum(!natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$`?..SITECODE`)  # 24000 
+sum(!natura2000_csv_n5$`?..SITECODE` %in% natura2000_csv_n4$SITECODE)  #  1208
 
-natura2000_csv_n5[natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$ï..SITECODE, ][100000, ]
-View(head(natura2000_csv_n5[natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$ï..SITECODE, ], 50))
+natura2000_csv_n5[natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$`?..SITECODE`, ][100000, ]
+View(head(natura2000_csv_n5[natura2000_csv_n4$SITECODE %in% natura2000_csv_n5$`?..SITECODE`, ], 50))
 View((natura2000_csv_n4[natura2000_csv_n4$SITECODE == "ES0000067", ]))
-View((natura2000_csv_n5[natura2000_csv_n5$ï..SITECODE == "ES0000067", ]))
-sum(natura2000_csv_n5[natura2000_csv_n5$ï..SITECODE == "ES0000067", "COVER_HA"])   # 62253.97
+View((natura2000_csv_n5[natura2000_csv_n5$`?..SITECODE` == "ES0000067", ]))
+sum(natura2000_csv_n5[natura2000_csv_n5$`?..SITECODE` == "ES0000067", "COVER_HA"])   # 62253.97
 
 
 
@@ -919,6 +989,112 @@ natura2000_csv_n10 <- read.csv(natura2000_csv[i], header = TRUE)
 View(head(natura2000_csv_n10, 50))
 names(natura2000_csv_n10)
 nrow(natura2000_csv_n10)
+
+
+
+
+
+
+
+## Crop Map ####
+
+list.files("/eos/jeodpp/home/users/rotllxa")
+list.files("/eos/jeodpp/home/users/rotllxa/data")
+list.files("/storage/rotllxa")
+list.files("/storage/rotllxa/Documents")
+
+getwd()
+list.files("/home/rotllxa/")
+list.files("/home/rotllxa/Documents/")
+
+list.files("/eos/jeodpp/data/base/")
+list.files("/eos/jeodpp/data/base/", recursive = TRUE)
+
+
+list.files("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/")
+list.files("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018")
+
+
+cropmap2018 <- raster("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/EUCROPMAP_2018.tif")  # at 10m
+cropmap2018
+plot(cropmap2018)
+
+cat_coords <-  c(3500000, 4100000, 1850000, 2400000)   # Catalonia (LAEA, m) (xmin, xmax, ymin, ymax)
+
+cropmap2018_cat <- crop(cropmap2018, extent(cat_coords))
+plot(cropmap2018_cat)
+
+#pixac_v7_byte_masked <- brick("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/pixac_v7_byte_masked.tif")
+#pixac_v7_byte_masked
+
+
+# CropMap classes
+#library(readr)
+#cropmap_classes_2018 <- read_file("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/EuroCropMap.qml")
+
+crops_categs <- c(100, 211, 212, 213, 214, 215, 216, 217, 218, 219, 221, 222, 223, 230, 231, 232, 233, 240, 250, 290, 300, 500, 600, 800)
+crops_names <- c("Artificial", "Common wheat", "Durum wheat", "Barley", "Rye", "Oats", "Maize", "Rice", "Triticale", "Other cereals", "Potatoes", "Sugar beet", "Other root crops", "Other non permanent industrial crops", "Sunflower", "Rape and turnip rape", "Soya", "Dry pulses", "Fodder crops (cereals and leguminous)", "Bare arable land", "Woodland and Shrubland (incl. permanent crops)", "Grasslands", "Bare land", "Wetlands")
+
+cropmap_classes <- data.frame("crop_categ" = crops_categs, "crop_names" = crops_names)
+View(cropmap_classes)
+
+# Maiz: 216
+
+
+## Aggregating maiz to 1km or 10km
+
+#cropmap2018_maiz <- cropmap2018
+#cropmap2018_maiz[cropmap2018_maiz$EUCROPMAP_2018 != 216] <- 0
+
+aggr_fun_1km <- function(x, ...) {     # returns share of maize at 1km (0 to 1)
+  mz_share <- sum(x == 216, na.rm = TRUE) / 10000
+  return(mz_share)
+}
+
+cropmap2018_maiz_1km <- aggregate(x = cropmap2018_cat, 
+                                  fact = 100,        # 1km
+                                  fun = aggr_fun_1km, 
+                                  expand = TRUE, 
+                                  na.rm = TRUE, 
+                                  filename = "cropmap2018_maiz_1km.tif",
+                                  overwrite = TRUE)
+
+cropmap2018_maiz_1km
+
+
+
+## Maiz weeds ####
+
+weeds_maiz <- read.csv("../weeds/weeds_maize_report_2011.csv", header = TRUE)
+head(weeds_maiz)
+nrow(weeds_maiz)
+
+
+occs_all_2018 <- occs_all[occs_all$year == 2018, ]
+
+nrow(occs_all_2018)
+sum(occs_all_2018$species == "")
+length(unique(occs_all_2018$species))
+
+
+occs_2018_specie <- unique(occs_all_2018$species)
+
+head(sort(occs_2018_specie), 50)
+head(sort(weeds_maiz$Species))
+
+sum(occs_2018_specie %in% weeds_maiz$Species)   # 151 sp
+sum(weeds_maiz$Species %in% occs_2018_specie)   # 151 sp
+sum(!weeds_maiz$Species %in% occs_2018_specie)   # 53 sp
+
+
+weeds_maiz_gbib <- sort(weeds_maiz$Species[weeds_maiz$Species %in% occs_2018_specie])
+weeds_maiz_not_gbib <- sort(weeds_maiz$Species[!weeds_maiz$Species %in% occs_2018_specie])
+
+
+occs_all_2018_maiz <- occs_all_2018[occs_all_2018$species %in% weeds_maiz_gbib, ]
+
+nrow(occs_all_2018_maiz)   # 158427 occurrences for 2018
+nrow(occs_all_2018)        # over 1591221 in total for 2018
 
 
 
