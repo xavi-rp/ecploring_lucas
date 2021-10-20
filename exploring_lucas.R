@@ -1014,14 +1014,26 @@ list.files("/eos/jeodpp/data/base/", recursive = TRUE)
 list.files("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/")
 list.files("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018")
 
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/BIODIVERSITY/")
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/BIODIVERSITY/DataRestoration")
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/BIODIVERSITY/DataRestoration/cropmap_res")
 
+
+cropmap2018 <- raster("/eos/jeodpp/data/projects/REFOCUS/data/BIODIVERSITY/DataRestoration/cropmap_res/eucropmap_res.tif")  # at 1km
 cropmap2018 <- raster("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/EUCROPMAP_2018.tif")  # at 10m
+cropmap2018 <- raster("/eos/jeodpp/home/users/rotllxa/exploring_lucas_data/eucropmap_2018/EUCROPMAP_2018.tif")  # at 10m
+
+#writeRaster(cropmap2018, "cropmap2018_10m.tif")
+
+sp::CRS("+init=EPSG:3035")
+crs(cropmap2018) <- "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs"
+
 cropmap2018
 plot(cropmap2018)
 
 cat_coords <-  c(3500000, 4100000, 1850000, 2400000)   # Catalonia (LAEA, m) (xmin, xmax, ymin, ymax)
 
-cropmap2018_cat <- crop(cropmap2018, extent(cat_coords))
+cropmap2018_cat <- crop(cropmap2018, extent(cat_coords), filename = "cropmap2018_cat.tif")
 plot(cropmap2018_cat)
 
 #pixac_v7_byte_masked <- brick("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/pixac_v7_byte_masked.tif")
@@ -1051,7 +1063,7 @@ aggr_fun_1km <- function(x, ...) {     # returns share of maize at 1km (0 to 1)
   return(mz_share)
 }
 
-cropmap2018_maiz_1km <- aggregate(x = cropmap2018_cat, 
+cropmap2018_maiz_1km <- aggregate(x = cropmap2018, 
                                   fact = 100,        # 1km
                                   fun = aggr_fun_1km, 
                                   expand = TRUE, 
