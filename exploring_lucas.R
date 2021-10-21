@@ -7,14 +7,13 @@ library(sp)
 library(sf)
 library(data.table)
 
-
 library(devtools)
 install_github("xavi-rp/PreSPickR", 
                ref = "v2", 
                INSTALL_opts = c("--no-multiarch"))  # https://github.com/rstudio/renv/issues/162
 library(PreSPickR)
 
-
+sessionInfo()
 
 if(Sys.info()[4] == "D01RI1700308") {
   wd <- "D:/xavi_rp/D5_FFGRCC_gbif_occ/"
@@ -266,8 +265,6 @@ length(unique(occs_all$datasetKey))
 sum(unique(occs_all$datasetKey) == "7a3679ef-5582-4aaa-81f0-8c2545cafc81")  # Pl@ntNet are there
 
 occs_all
-
-
 
 
 
@@ -1020,21 +1017,28 @@ list.files("/eos/jeodpp/data/projects/REFOCUS/data/BIODIVERSITY/DataRestoration/
 
 
 cropmap2018 <- raster("/eos/jeodpp/data/projects/REFOCUS/data/BIODIVERSITY/DataRestoration/cropmap_res/eucropmap_res.tif")  # at 1km
-cropmap2018 <- raster("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/EUCROPMAP_2018.tif")  # at 10m
 cropmap2018 <- raster("/eos/jeodpp/home/users/rotllxa/exploring_lucas_data/eucropmap_2018/EUCROPMAP_2018.tif")  # at 10m
-
-#writeRaster(cropmap2018, "cropmap2018_10m.tif")
-
-sp::CRS("+init=EPSG:3035")
-crs(cropmap2018) <- "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs"
+cropmap2018 <- raster("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/EUCROPMAP_2018.tif")  # at 10m
+#sp:::CRS("+init=EPSG:3035")
 
 cropmap2018
-plot(cropmap2018)
 
-cat_coords <-  c(3500000, 4100000, 1850000, 2400000)   # Catalonia (LAEA, m) (xmin, xmax, ymin, ymax)
+cat_coords <-  c(3500000, 3800000, 1900000, 2300000)   # Catalonia (LAEA, m) (xmin, xmax, ymin, ymax)
 
-cropmap2018_cat <- crop(cropmap2018, extent(cat_coords), filename = "cropmap2018_cat.tif")
+cropmap2018_cat <- crop(cropmap2018, extent(cat_coords), 
+                        filename = "cropmap2018_cat.tif",
+                        overwrite = TRUE)
 plot(cropmap2018_cat)
+cropmap2018_cat <- raster("cropmap2018_cat.tif")
+
+
+fr_coords <-  c(2500000, 4500000, 2200000, 5300000)   # France (LAEA, m) (xmin, xmax, ymin, ymax)
+
+cropmap2018_fr <- crop(cropmap2018, extent(fr_coords), 
+                        filename = "cropmap2018_fr.tif",
+                        overwrite = TRUE)
+plot(cropmap2018_fr)
+
 
 #pixac_v7_byte_masked <- brick("/mnt/cidstorage/cidportal/data/OpenData/EUCROPMAP/2018/pixac_v7_byte_masked.tif")
 #pixac_v7_byte_masked
@@ -1059,19 +1063,44 @@ View(cropmap_classes)
 #cropmap2018_maiz[cropmap2018_maiz$EUCROPMAP_2018 != 216] <- 0
 
 aggr_fun_1km <- function(x, ...) {     # returns share of maize at 1km (0 to 1)
-  mz_share <- sum(x == 216, na.rm = TRUE) / 10000
+  if (all(is.na(x))){
+    mz_share <- NA
+  }else{
+    mz_share <- sum(x == 216, na.rm = TRUE) / 10000
+  }
+  
   return(mz_share)
 }
 
-cropmap2018_maiz_1km <- aggregate(x = cropmap2018, 
+cropmap2018_maiz_1km <- aggregate(x = cropmap2018_fr, 
                                   fact = 100,        # 1km
                                   fun = aggr_fun_1km, 
                                   expand = TRUE, 
                                   na.rm = TRUE, 
-                                  filename = "cropmap2018_maiz_1km.tif",
+                                  #filename = "cropmap2018_maiz_1km.tif",
+                                  filename = "",
                                   overwrite = TRUE)
 
 cropmap2018_maiz_1km
+plot(cropmap2018_maiz_1km)
+
+#sf::st_crs(3035)
+wkt <- sf::st_crs(3035)[[2]]
+#sp::CRS(wkt)
+crs(cropmap2018_maiz_1km) <- sp::CRS(wkt)
+
+writeRaster(cropmap2018_maiz_1km, "cropmap2018_maiz_1km_fr.tif", overwrite = TRUE)
+cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km_cat.tif")
+cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km_fr.tif")
+crs(cropmap2018_maiz_1km) <- sp::CRS(wkt)
+
+
+cropmap2018_maiz_1km_vals <- getValues(cropmap2018_maiz_1km) 
+
+sum(!is.na(cropmap2018_maiz_1km_vals))             # for Cat, 31059 pixels with some maize. For FR
+sum(cropmap2018_maiz_1km_vals > 0, na.rm = TRUE)   # over a total of 61533 (not NA). For FR
+(sum(cropmap2018_maiz_1km_vals > 0, na.rm = TRUE) / sum(!is.na(cropmap2018_maiz_1km_vals))) * 100   # Cat: 50.47%; FR: 
+
 
 
 
@@ -1081,8 +1110,11 @@ weeds_maiz <- read.csv("../weeds/weeds_maize_report_2011.csv", header = TRUE)
 head(weeds_maiz)
 nrow(weeds_maiz)
 
-
-occs_all_2018 <- occs_all[occs_all$year == 2018, ]
+occs_all <- fread(paste0(getwd(), "/D5_FFGRCC_gbif_occ/sp_records_20210709.csv"), header = TRUE)
+cols_order <- c("species", "decimalLatitude", "decimalLongitude", "gbifID", "countryCode", "year")
+occs_all <- occs_all[, .SD, .SDcols = cols_order]
+occs_all <- occs_all[occs_all$species != "", ]
+occs_all_2018 <- occs_all[occs_all$year == 2018, ]  # 1591221 occs for 2018
 
 nrow(occs_all_2018)
 sum(occs_all_2018$species == "")
@@ -1107,6 +1139,103 @@ occs_all_2018_maiz <- occs_all_2018[occs_all_2018$species %in% weeds_maiz_gbib, 
 
 nrow(occs_all_2018_maiz)   # 158427 occurrences for 2018
 nrow(occs_all_2018)        # over 1591221 in total for 2018
+
+sum(occs_all_2018_maiz$countryCode == "ES")
+sum(occs_all_2018_maiz$countryCode == "FR")
+
+
+setnames(occs_all_2018_maiz, c("decimalLongitude", "decimalLatitude"), c("x", "y"))
+
+occs_all_2018_maiz <- occs_all_2018_maiz[, .SD, .SDcols = c("species", "x", "y", "gbifID", "countryCode", "year")]
+
+occs_all_2018_maiz_sf <- st_as_sf(as.data.frame(occs_all_2018_maiz), coords = c("x", "y"), crs = 4326)#, agr = "constant")
+occs_all_2018_maiz_sf
+
+#sf::st_crs(3035)
+wkt <- sf::st_crs(3035)[[2]]
+#sp::CRS(wkt)
+#occs_all_2018_maiz_sf[occs_all_2018_maiz_sf$countryCode == "ES", ]
+
+
+occs_all_2018_maiz_sf_laea <- st_transform(occs_all_2018_maiz_sf, crs = sp::CRS(wkt))
+occs_all_2018_maiz_sf_laea
+
+occs_maizeShare <- as.data.table(extract(cropmap2018_maiz_1km, occs_all_2018_maiz_sf_laea, cellnumbers = TRUE))
+occs_maizeShare
+
+occs_all_2018_maiz_sf_laea_dt <- as.data.table(occs_all_2018_maiz_sf_laea)
+
+occs_maizeShare <- cbind(occs_all_2018_maiz_sf_laea_dt, occs_maizeShare)
+occs_maizeShare
+
+occs_maizeShare <- na.omit(occs_maizeShare)
+
+setkeyv(occs_maizeShare, "cells")
+occs_maizeShare
+
+sum(occs_maizeShare$cropmap2018_maiz_1km_cat == 0)
+sum(occs_maizeShare$cropmap2018_maiz_1km_cat != 0)
+
+occs_maizeShare
+length(unique(occs_maizeShare$cells))
+
+
+summary(as.vector(table(occs_maizeShare$cells)))
+#   Min. 1st Qu.  Median   Mean  3rd Qu.    Max. 
+# 1.000   1.000   1.000   1.521   2.000  18.000 
+
+
+occs_maizeShare_aggr <- as.data.table(table(occs_maizeShare$cells))
+occs_maizeShare_aggr <- occs_maizeShare_aggr[, lapply(.SD, as.numeric)]
+str(occs_maizeShare_aggr)
+
+occs_maizeShare_1 <- occs_maizeShare[, 6:7]
+occs_maizeShare_1[unique(occs_maizeShare_1$cells), ]
+
+occs_maizeShare_1 <- unique(occs_maizeShare_1, by = "cells")
+
+occs_maizeShare_1 <- merge(occs_maizeShare_1, occs_maizeShare_aggr, by.x = "cells", by.y = "V1", all.x = TRUE)
+occs_maizeShare_1
+
+summary(occs_maizeShare_1$cropmap2018_maiz_1km_cat)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.00000 0.00000 0.00010 0.01827 0.00320 0.58650 
+
+
+plot(y = occs_maizeShare_1$N,  # x
+     x = occs_maizeShare_1$cropmap2018_maiz_1km_cat, # y
+     main = "",
+     ylab = "Number of occurrences", 
+     xlab = "Maize share", 
+     pch = 19)
+
+abline(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$cropmap2018_maiz_1km_cat), col = "red") # regression line (y~x)
+
+# rounding Mize shares
+occs_maizeShare_2 <- occs_maizeShare_1
+occs_maizeShare_2$cropmap2018_maiz_1km_cat <- round(occs_maizeShare_2$cropmap2018_maiz_1km_cat, 1)
+
+pdf("Occs_MaizeShare_Cat.pdf")
+plot(y = occs_maizeShare_2$N, 
+     x = occs_maizeShare_2$cropmap2018_maiz_1km_cat,
+     main = "",
+     ylab = "Number of occurrences", 
+     xlab = "Maize share (rounded)", 
+     pch = 19)
+
+abline(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km_cat), col = "red") # regression line (y~x)
+dev.off()
+
+
+# Linear Regression
+summary(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km_cat))
+
+# Pearson Correlation
+cor(occs_maizeShare_2$N, occs_maizeShare_2$cropmap2018_maiz_1km_cat, method = "pearson") # -0.017
+
+#
+
+
 
 
 
