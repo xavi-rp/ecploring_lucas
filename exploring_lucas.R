@@ -1032,7 +1032,7 @@ plot(cropmap2018_cat)
 cropmap2018_cat <- raster("cropmap2018_cat.tif")
 
 
-fr_coords <-  c(2500000, 4500000, 2200000, 5300000)   # France (LAEA, m) (xmin, xmax, ymin, ymax)
+fr_coords <-  c(3100000, 4300000, 2200000, 3400000)   # France (LAEA, m) (xmin, xmax, ymin, ymax)
 
 cropmap2018_fr <- crop(cropmap2018, extent(fr_coords), 
                         filename = "cropmap2018_fr.tif",
@@ -1072,7 +1072,7 @@ aggr_fun_1km <- function(x, ...) {     # returns share of maize at 1km (0 to 1)
   return(mz_share)
 }
 
-cropmap2018_maiz_1km <- aggregate(x = cropmap2018_fr, 
+cropmap2018_maiz_1km <- aggregate(x = cropmap2018, 
                                   fact = 100,        # 1km
                                   fun = aggr_fun_1km, 
                                   expand = TRUE, 
@@ -1089,17 +1089,18 @@ wkt <- sf::st_crs(3035)[[2]]
 #sp::CRS(wkt)
 crs(cropmap2018_maiz_1km) <- sp::CRS(wkt)
 
-writeRaster(cropmap2018_maiz_1km, "cropmap2018_maiz_1km_fr.tif", overwrite = TRUE)
+writeRaster(cropmap2018_maiz_1km, "cropmap2018_maiz_1km.tif", overwrite = TRUE)
 cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km_cat.tif")
 cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km_fr.tif")
+cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km.tif")
 crs(cropmap2018_maiz_1km) <- sp::CRS(wkt)
 
 
 cropmap2018_maiz_1km_vals <- getValues(cropmap2018_maiz_1km) 
 
-sum(!is.na(cropmap2018_maiz_1km_vals))             # for Cat, 31059 pixels with some maize. For FR
-sum(cropmap2018_maiz_1km_vals > 0, na.rm = TRUE)   # over a total of 61533 (not NA). For FR
-(sum(cropmap2018_maiz_1km_vals > 0, na.rm = TRUE) / sum(!is.na(cropmap2018_maiz_1km_vals))) * 100   # Cat: 50.47%; FR: 
+sum(!is.na(cropmap2018_maiz_1km_vals))             # for Cat, 31059 pixels with some maize. For EU 3500020
+sum(cropmap2018_maiz_1km_vals > 0, na.rm = TRUE)   # over a total of 61533 (not NA). For EU 4285358
+(sum(cropmap2018_maiz_1km_vals > 0, na.rm = TRUE) / sum(!is.na(cropmap2018_maiz_1km_vals))) * 100   # Cat: 50.47%; EU: 81.67 
 
 
 
@@ -1161,7 +1162,9 @@ occs_all_2018_maiz_sf_laea <- st_transform(occs_all_2018_maiz_sf, crs = sp::CRS(
 occs_all_2018_maiz_sf_laea
 
 occs_maizeShare <- as.data.table(extract(cropmap2018_maiz_1km, occs_all_2018_maiz_sf_laea, cellnumbers = TRUE))
-occs_maizeShare
+occs_maizeShare  
+
+# We keep pixels with some maize and at least one of the weeds !!! 
 
 occs_all_2018_maiz_sf_laea_dt <- as.data.table(occs_all_2018_maiz_sf_laea)
 
@@ -1184,6 +1187,9 @@ summary(as.vector(table(occs_maizeShare$cells)))
 #   Min. 1st Qu.  Median   Mean  3rd Qu.    Max. 
 # 1.000   1.000   1.000   1.521   2.000  18.000 
 
+#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#   1.000   1.000   1.000   2.274   2.000 458.000 
+
 
 occs_maizeShare_aggr <- as.data.table(table(occs_maizeShare$cells))
 occs_maizeShare_aggr <- occs_maizeShare_aggr[, lapply(.SD, as.numeric)]
@@ -1201,42 +1207,87 @@ summary(occs_maizeShare_1$cropmap2018_maiz_1km_cat)
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 #0.00000 0.00000 0.00010 0.01827 0.00320 0.58650 
 
+summary(occs_maizeShare_1$cropmap2018_fr)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.00000 0.00490 0.02010 0.05797 0.07660 0.79960  
 
+summary(occs_maizeShare_1$EUCROPMAP_2018)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.00000 0.00240 0.01280 0.04876 0.05685 0.87980 
+
+
+pdf("Occs_MaizeShare_Eur.pdf")
 plot(y = occs_maizeShare_1$N,  # x
-     x = occs_maizeShare_1$cropmap2018_maiz_1km_cat, # y
+     x = occs_maizeShare_1$EUCROPMAP_2018, # y
      main = "",
      ylab = "Number of occurrences", 
      xlab = "Maize share", 
      pch = 19)
 
-abline(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$cropmap2018_maiz_1km_cat), col = "red") # regression line (y~x)
+abline(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$EUCROPMAP_2018), col = "red") # regression line (y~x)
+dev.off()
 
 # rounding Mize shares
 occs_maizeShare_2 <- occs_maizeShare_1
-occs_maizeShare_2$cropmap2018_maiz_1km_cat <- round(occs_maizeShare_2$cropmap2018_maiz_1km_cat, 1)
+occs_maizeShare_2$EUCROPMAP_2018 <- round(occs_maizeShare_2$EUCROPMAP_2018, 1)
 
-pdf("Occs_MaizeShare_Cat.pdf")
 plot(y = occs_maizeShare_2$N, 
-     x = occs_maizeShare_2$cropmap2018_maiz_1km_cat,
+     x = occs_maizeShare_2$EUCROPMAP_2018,
      main = "",
      ylab = "Number of occurrences", 
      xlab = "Maize share (rounded)", 
      pch = 19)
 
-abline(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km_cat), col = "red") # regression line (y~x)
+abline(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$EUCROPMAP_2018), col = "red") # regression line (y~x)
 dev.off()
 
 
 # Linear Regression
-summary(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km_cat))
+summary(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$EUCROPMAP_2018))
 
 # Pearson Correlation
-cor(occs_maizeShare_2$N, occs_maizeShare_2$cropmap2018_maiz_1km_cat, method = "pearson") # -0.017
-
-#
+cor(occs_maizeShare_2$N, occs_maizeShare_2$EUCROPMAP_2018, method = "pearson") # Cat: -0.017; FR: -0.032; Eur: -0.021
 
 
 
+# Outliers
+boxplot(occs_maizeShare_1$EUCROPMAP_2018)
+boxplot(occs_maizeShare_1$N)
 
+hist(occs_maizeShare_1$N)
+hist(occs_maizeShare_1$EUCROPMAP_2018)
+
+tail(sort(occs_maizeShare_1$N), 40)
+
+summary(occs_maizeShare_1$N)
+quantile(occs_maizeShare_1$N, c(0.95, 0.9772, 0.98, 0.99, 0.995, 0.997, 0.9999))
+
+
+occs_maizeShare_2 <- occs_maizeShare_1
+nrow(occs_maizeShare_1)
+occs_maizeShare_2 <- occs_maizeShare_2[occs_maizeShare_2$N <= quantile(occs_maizeShare_2$N, 0.99), ]
+nrow(occs_maizeShare_2)
+
+pdf("Occs_MaizeShare_Eur_NoOutliers_99.pdf")
+plot(y = occs_maizeShare_2$N, 
+     x = occs_maizeShare_2$EUCROPMAP_2018,
+     main = "",
+     ylab = "Number of occurrences (<= 99th Percentile)", 
+     xlab = "Maize share", 
+     pch = 19)
+abline(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$EUCROPMAP_2018), col = "red") # regression line (y~x)
+
+pears_cor <- cor(occs_maizeShare_2$N, occs_maizeShare_2$EUCROPMAP_2018, method = "pearson") # Eur: -0.031
+pears_cor
+
+mtext(paste0("Pearson's r = ", round(pears_cor, 3)),
+      col = "red",
+      side = 1, line = 2.5, 
+      adj = 1,
+      cex = 1)
+
+dev.off()
+
+summary(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$EUCROPMAP_2018))
 
 
