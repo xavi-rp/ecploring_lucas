@@ -1093,7 +1093,7 @@ writeRaster(cropmap2018_maiz_1km, "cropmap2018_maiz_1km.tif", overwrite = TRUE)
 cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km_cat.tif")
 cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km_fr.tif")
 cropmap2018_maiz_1km <- raster("cropmap2018_maiz_1km.tif")
-crs(cropmap2018_maiz_1km) <- sp::CRS(wkt)
+#crs(cropmap2018_maiz_1km) <- sp::CRS(wkt)
 
 
 cropmap2018_maiz_1km_vals <- getValues(cropmap2018_maiz_1km) 
@@ -1191,7 +1191,7 @@ head(sort(weeds_maize$Species))
 
 sum(occs_2018_specie %in% weeds_maize$Species)   # 151 sp
 sum(weeds_maize$Species %in% occs_2018_specie)   # 151 sp
-sum(!weeds_maize$Species %in% occs_2018_specie)   # 53 sp
+sum(!weeds_maize$Species %in% occs_2018_specie)   # 53 sp which we don't have in maize fields (CropMap)
 
 
 weeds_maiz_gbib <- sort(weeds_maize$Species[weeds_maize$Species %in% occs_2018_specie])
@@ -1256,6 +1256,10 @@ occs_maizeShare <- na.omit(occs_maizeShare)
 setkeyv(occs_maizeShare, "cells")
 occs_maizeShare
 
+# Removing repeated occurrences (same sp) in the same pixel
+occs_maizeShare <- occs_maizeShare[!duplicated(occs_maizeShare[, c("species", "cells")]), ]
+
+
 sum(occs_maizeShare$cropmap2018_maiz_1km_cat == 0)
 sum(occs_maizeShare$cropmap2018_maiz_1km_cat != 0)
 
@@ -1268,7 +1272,7 @@ summary(as.vector(table(occs_maizeShare$cells)))
 # 1.000   1.000   1.000   1.521   2.000  18.000 
 
 #    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#   1.000   1.000   1.000   2.274   2.000 458.000 
+#  1.000   1.000   1.000   1.735   2.000  37.000 
 
 
 occs_maizeShare_aggr <- as.data.table(table(occs_maizeShare$cells))
@@ -1319,7 +1323,7 @@ plot(y = occs_maizeShare_1$N,  # x
      pch = 19)
 dev.off()
 
-abline(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$EUCROPMAP_2018), col = "red") # regression line (y~x)
+abline(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$cropmap2018_maiz_1km), col = "red") # regression line (y~x)
 
 summary(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$cropmap2018_maiz_1km))
 coef(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$cropmap2018_maiz_1km))
@@ -1366,9 +1370,9 @@ boxplot(occs_maizeShare_1$EUCROPMAP_2018)
 boxplot(occs_maizeShare_1$cropmap2018_maiz_1km)
 boxplot(occs_maizeShare_1$N)
 
-hist(occs_maizeShare_1$N)
+hist(occs_maizeShare_1$N, xlab = "Number of occurrences")
 hist(occs_maizeShare_1$EUCROPMAP_2018)
-hist(occs_maizeShare_1$cropmap2018_maiz_1km)
+hist(occs_maizeShare_1$cropmap2018_maiz_1km, xlab = "Maize share")
 
 tail(sort(occs_maizeShare_1$N), 40)
 
@@ -1391,7 +1395,7 @@ plot(y = occs_maizeShare_2$N,
      pch = 19)
 dev.off()
 
-abline(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$EUCROPMAP_2018), col = "red") # regression line (y~x)
+abline(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km), col = "red") # regression line (y~x)
 
 pears_cor <- cor(occs_maizeShare_2$N, occs_maizeShare_2$EUCROPMAP_2018, method = "pearson") # Eur: -0.031
 pears_cor <- cor(occs_maizeShare_2$N, occs_maizeShare_2$cropmap2018_maiz_1km, method = "pearson") # Eur: -0.023
@@ -1407,7 +1411,7 @@ mtext(paste0("Pearson's r = ", round(pears_cor, 3)),
 summary(lm(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km))
 
 
-boxplot(occs_maizeShare_2$N ~ occs_maizeShare_2$maize_share_class, 
+boxplot(occs_maizeShare_2$N ~ occs_maizeShare_2$cropmap2018_maiz_1km, 
         main = "",
         xlab = "Maize shares", 
         ylab = "Number of occurrences")
@@ -1420,15 +1424,15 @@ nrow(occs_maizeShare_1)
 occs_maizeShare_3 <- occs_maizeShare_3[occs_maizeShare_3$N <= quantile(occs_maizeShare_3$N, 0.9999), ]
 nrow(occs_maizeShare_3)
 
-pdf("Occs_MaizeShare_Eur_NoOutliers_5.pdf")
-plot(y = occs_maizeShare_3$N, 
-     x =  occs_maizeShare_3$cropmap2018_maiz_1km,
+pdf("Occs_MaizeShare_Eur_NoOutliers.pdf")
+plot(y = log(occs_maizeShare_3$N), 
+     x =  log(occs_maizeShare_3$cropmap2018_maiz_1km),
      main = "",
      #ylab = "Number of occurrences (5 <= N <= 99.99th Percentile)", 
-     ylab = "Number of occurrences (<= 99.99th Percentile)", 
-     xlab = "Maize share", 
+     ylab = "log - Number of occurrences (<= 99.99th Percentile)", 
+     xlab = "log - Maize share", 
      pch = 19)
-abline(lm(occs_maizeShare_3$N ~ occs_maizeShare_3$cropmap2018_maiz_1km), col = "red") # regression line (y~x)
+abline(lm(log(occs_maizeShare_3$N) ~ log(occs_maizeShare_3$cropmap2018_maiz_1km)), col = "red") # regression line (y~x)
 
 pears_cor <- cor(occs_maizeShare_3$N, occs_maizeShare_3$cropmap2018_maiz_1km, method = "pearson") # Eur: -0.023
 pears_cor
@@ -1493,6 +1497,8 @@ summary(model)
 
 occs_maizeShare_1$N_all_NoWeeds <- occs_maizeShare_1$N_all - occs_maizeShare_1$N
 
+hist(occs_maizeShare_1$N_all_NoWeeds, xlab = "All sp (no weeds)")
+
 plot(x = occs_maizeShare_1$N_all_NoWeeds, 
      y = occs_maizeShare_1$N, 
      main = "",
@@ -1506,7 +1512,21 @@ abline(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$N_all_NoWeeds), col = "red") #
 pears_cor_1 <- cor(occs_maizeShare_1$N, occs_maizeShare_1$N_all_NoWeeds, method = "pearson") # Eur: 0.70  (Not a very strong correlation, but still)
 pears_cor_1
 
-summary(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$N_all_NoWeeds))  # significant; R-squared = 0.495
+summary(lm(occs_maizeShare_1$N ~ occs_maizeShare_1$N_all_NoWeeds))  # significant; R-squared = 0.495; but no normal variables
+
+# GAM
+library(mgcv)
+summary(gam(N ~ s(N_all_NoWeeds), data = occs_maizeShare_1))   # R-sq.(adj) =  0.605
+summary(gam(N ~ N_all_NoWeeds, data = occs_maizeShare_1))      # R-sq.(adj) =  0.495
+
+# GLM
+mdl1 <- glm(occs_maizeShare_1$N ~ occs_maizeShare_1$N_all_NoWeeds, family = "poisson")
+summary(mdl1)    # 
+coef(mdl1)       # It gives a positive effect
+aov(mdl1)
+with(summary(mdl1), 1 - deviance/null.deviance)  # goodness of fit   # 0.18
+
+
 
 
 
@@ -1545,3 +1565,132 @@ coef(modl)
 
 pears_cor_2 <- cor(occs_maizeShare_1$N_all, occs_maizeShare_1$cropmap2018_maiz_1km, method = "pearson") # Eur: -0.042
 pears_cor_2
+
+
+
+## Downloading Zea mays occurrences
+
+GetBIF(credentials = paste0(gbif_creds, "/gbif_credentials.RData"),
+       taxon_list = "Zea mays",
+      download_format = "SIMPLE_CSV",
+       download_years = c(2000, 2021),
+       download_coords = c(-12.69141, 42.71485, 33.4901, 71.9218), #order: xmin, xmax, ymin, ymax
+       download_coords_accuracy = c(0, 50),
+       rm_dupl = TRUE,
+       cols2keep = c("species", "decimalLatitude", "decimalLongitude", #"elevation",
+                     "gbifID",
+                     "coordinateUncertaintyInMeters",
+                     "countryCode", "year", 
+                     "datasetKey"
+       ),
+       out_name = paste0("maize_records_", format(Sys.Date(), "%Y%m%d"))
+      )
+
+
+taxon_dir <- "/eos/jeodpp/home/users/rotllxa/exploring_lucas_data"
+taxons <- "Zea mays"
+data1 <- Prep_BIF(taxon_dir = paste0(taxon_dir, "/"),
+                  taxons = taxons,
+                  cols2keep = c("species", "decimalLatitude", "decimalLongitude", #"elevation",
+                                "gbifID",
+                                "coordinateUncertaintyInMeters",
+                                "countryCode", "year", 
+                                #"institutionCode",	"collectionCode",
+                                #"ownerInstitutionCode",
+                                "datasetKey"
+                  ),
+                  #cols2keep = "all",
+                  rm_dupl = TRUE)
+
+data1
+
+
+
+
+## Grouping by 10 classes of maize share 
+occs_maizeShare_kk <- occs_maizeShare
+occs_maizeShare <- occs_maizeShare_kk
+
+
+sum(is.na(cut(occs_maizeShare$cropmap2018_maiz_1km, breaks = seq(0, 1, 0.1), include.lowest = TRUE, right = FALSE)))
+sort(unique(cut(occs_maizeShare$cropmap2018_maiz_1km, breaks = seq(0, 1, 0.1), include.lowest = TRUE, right = FALSE)))
+table(cut(occs_maizeShare$cropmap2018_maiz_1km, breaks = seq(0, 1, 0.1), include.lowest = TRUE, right = FALSE))
+
+occs_maizeShare$maiz_share_class <- cut(occs_maizeShare$cropmap2018_maiz_1km, breaks = seq(0, 1, 0.1), include.lowest = TRUE, right = FALSE)
+occs_maizeShare
+
+sum(is.na(occs_maizeShare$maiz_share_class))
+sort(unique(occs_maizeShare$maiz_share_class))
+table(occs_maizeShare$maiz_share_class)
+# [0,0.1) [0.1,0.2) [0.2,0.3) [0.3,0.4) [0.4,0.5) [0.5,0.6) [0.6,0.7) [0.7,0.8) [0.8,0.9)   [0.9,1] 
+#   89803      9975      3838      1519       474       179        47        22         5         0 
+
+
+sp_00 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0,0.1)", "species"]))))
+sp_01 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.1,0.2)", "species"]))))
+sp_02 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.2,0.3)", "species"]))))
+sp_03 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.3,0.4)", "species"]))))
+sp_04 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.4,0.5)", "species"]))))
+sp_05 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.5,0.6)", "species"]))))
+sp_06 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.6,0.7)", "species"]))))
+sp_07 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.7,0.8)", "species"]))))
+sp_08 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.8,0.9)", "species"]))))
+sp_09 <- sort(as.vector(unlist(unique(occs_maizeShare[occs_maizeShare$maiz_share_class == "[0.9,1]", "species"]))))   # no species here
+
+Reduce(intersect, list(sp_00,
+                       sp_01,
+                       sp_02,
+                       sp_03,
+                       sp_04,
+                       sp_05,
+                       sp_06,
+                       sp_07,
+                       sp_08#,
+                       #sp_09
+                       ))      # These are the plants in all groups: "Abutilon theophrasti" "Phytolacca americana"
+
+sp_08  # plants in group 08: "Abutilon theophrasti" "Chenopodium album" "Convolvulus arvensis" 
+       #                     "Phytolacca americana" (invasive)
+       #                     "Portulaca oleracea"
+       # All very common weeds
+
+
+sp_00_notOthers <- sp_00[!sp_00 %in% c(sp_01) &
+                           !sp_00 %in% c(sp_02) &
+                           !sp_00 %in% c(sp_03) &
+                           !sp_00 %in% c(sp_04) &
+                           !sp_00 %in% c(sp_05) &
+                           !sp_00 %in% c(sp_06) &
+                           !sp_00 %in% c(sp_07) &
+                           !sp_00 %in% c(sp_08) &
+                           !sp_00 %in% c(sp_09)
+                         ]
+sp_00_not01  # These are the species that are only found in group 0; therefore, they could be 
+             # our "indicators of low intensification"
+  
+
+
+sp_01_notOthers <- sp_01[#!sp_01 %in% c(sp_00) &
+                           !sp_01 %in% c(sp_02) &
+                           !sp_01 %in% c(sp_03) &
+                           !sp_01 %in% c(sp_04) &
+                           !sp_01 %in% c(sp_05) &
+                           !sp_01 %in% c(sp_06) &
+                           !sp_01 %in% c(sp_07) &
+                           !sp_01 %in% c(sp_08) &
+                           !sp_01 %in% c(sp_09)
+                         ]
+sp_01_notOthers  # This is the species that is only found in group 1: "Fumaria schleicheri"
+
+                 # These are the (10) species that are only found in group 1 and 0: 
+                 # "Amaranthus blitoides" "Atriplex patula"      "Brassica nigra"       
+                 # "Eclipta prostrata"    "Fumaria schleicheri"  "Rumex pulcher"
+                 # "Senecio vernalis"  "Silene noctiflora"    "Tribulus terrestris"  "Veronica agrestis" 
+  
+sum(sp_00 %in% "Amaranthus blitoides")
+sum(sp_00 %in% "Atriplex patula")
+sum(sp_00 %in% "Silene noctiflora")
+sum(sp_00 %in% sp_01_notOthers)   # 9 ??????
+
+
+
