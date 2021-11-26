@@ -6,7 +6,7 @@ library(rvest)
 library(sp)
 library(sf)
 library(data.table)
-
+library(RVenn)
 library(devtools)
 install_github("xavi-rp/PreSPickR", 
                ref = "v2", 
@@ -1607,7 +1607,11 @@ data1
 
 
 
+
 ## Grouping by 10 classes of maize share 
+fwrite(occs_maizeShare, file = "/eos/jeodpp/home/users/rotllxa/weeds/occs_maizeShare.csv", row.names = FALSE, quote = FALSE)
+occs_maizeShare <- fread("/eos/jeodpp/home/users/rotllxa/weeds/occs_maizeShare.csv", header = TRUE)
+
 occs_maizeShare_kk <- occs_maizeShare
 occs_maizeShare <- occs_maizeShare_kk
 
@@ -1665,9 +1669,41 @@ sp_00_notOthers <- sp_00[!sp_00 %in% c(sp_01) &
                            !sp_00 %in% c(sp_08) &
                            !sp_00 %in% c(sp_09)
                          ]
-sp_00_not01  # These are the species that are only found in group 0; therefore, they could be 
-             # our "indicators of low intensification"
-  
+sp_00_notOthers  # These are the species that are only found in group 0; therefore, they could be 
+                 # our "indicators of low intensification". How many times?
+
+occs_00 <- occs_maizeShare[occs_maizeShare$maiz_share_class == "[0,0.1)", ]
+length(unique(occs_00$species))
+
+occs_00_indicators <- occs_00[occs_00$species %in% sp_00_notOthers, ]
+occs_00_indicators
+occs_00_indicators <- table(occs_00_indicators$species)
+occs_00_indicators <- sort(occs_00_indicators, decreasing = TRUE)
+occs_00_indicators
+
+# These are the "indicator species" and how many times they appear in pixels with maize (always class [0,0.1)):
+#
+# Galium tricornutum     Digitaria ischaemum       Xanthium spinosum   Chrozophora tinctoria    Caucalis platycarpos    Chenopodium vulvaria 
+#  36                      19                      13                      12                      11                      10 
+# Polygonum persicaria      Cyperus rotundus      Fumaria parviflora   Phalaris brachystachys         Eleusine indica      Amaranthus viridis 
+#   9                          7                       7                       7                       6                       5 
+# Phalaris paradoxa          Phalaris minor      Acalypha virginica   Chenopodium opulifolium        Euphorbia nutans        Ridolfia segetum 
+#   5                         4                       3                       3                       3                       3 
+# Kickxia lanigera   Solanum physalifolium   Amaranthus graecizans      Diplotaxis virgata    Eragrostis virescens      Pulicaria paludosa 
+#   2                       2                       1                       1                       1                       1 
+# Xanthium albinum 
+#   1 
+
+
+
+# For the other species in class 0, not "indicators"
+# These appear many more times
+
+occs_00_NotIndicators <- occs_00[!occs_00$species %in% sp_00_notOthers, ]
+occs_00_NotIndicators <- table(occs_00_NotIndicators$species)
+occs_00_NotIndicators <- sort(occs_00_NotIndicators, decreasing = TRUE)
+occs_00_NotIndicators
+
 
 
 sp_01_notOthers <- sp_01[#!sp_01 %in% c(sp_00) &
@@ -1691,6 +1727,159 @@ sum(sp_00 %in% "Amaranthus blitoides")
 sum(sp_00 %in% "Atriplex patula")
 sum(sp_00 %in% "Silene noctiflora")
 sum(sp_00 %in% sp_01_notOthers)   # 9 ??????
+sp_01_notOthers[!sp_01_notOthers %in% sp_00]   # "Fumaria schleicheri" is only in group 1 (not in group 0!)
+
+
+
+
+## Some plots:
+
+sps_groups <- list(grp00 = sp_00,
+                   grp01 = sp_01,
+                   grp02 = sp_02,
+                   grp03 = sp_03,
+                   grp04 = sp_04,
+                   grp05 = sp_05,
+                   grp06 = sp_06,
+                   grp07 = sp_07,
+                   grp08 = sp_08#,
+                   #grp09 = sp_09
+)
+
+grp_names <- as.vector(sort(unique(occs_maizeShare$maiz_share_class)))
+names(sps_groups) <- grp_names
+
+sp_01_08 <- c(sp_01,
+              sp_02,
+              sp_03,
+              sp_04,
+              sp_05,
+              sp_06,
+              sp_07,
+              sp_08)
+sp_01_08 <- unique(sp_01_08)
+
+sps_groups_1 <- list(grp00 = sp_00,
+                     grp01_08 = sp_01_08)
+sps_groups_1
+
+
+sp_02_08 <- c(sp_02,
+              sp_03,
+              sp_04,
+              sp_05,
+              sp_06,
+              sp_07,
+              sp_08)
+sp_02_08 <- unique(sp_02_08)
+
+sps_groups_2 <- list(grp00 = sp_00,
+                     grp01 = sp_01,
+                     grp02_08 = sp_02_08)
+names(sps_groups_2) <- c(paste0("Maize share = ", grp_names[1]), 
+                         paste0("Maize share = ", grp_names[2]), 
+                         paste0("Maize share >= 0.2"))
+
+
+
+# Barplot
+sps_groups_vctr <- sapply(sps_groups, length)
+plot(sps_groups_vctr)
+
+pdf(paste0("/eos/jeodpp/home/users/rotllxa/weeds/", "barplot_IndicatorSp.pdf"),
+    width = 16, height = 8)
+par(mar = c(5, 5, 5, 3))
+barplot(sps_groups_vctr, 
+        space = 0,
+        names.arg = grp_names,
+        ylab = "Species richness",
+        xlab = "Maize share (intervals)",
+        ylim = c(0, (max(sps_groups_vctr) + 10)),
+        cex.axis = 1.2,
+        cex.names = 1.2, 
+        cex.lab = 1.5)
+dev.off()       
+
+
+# Venn diagram
+# Venn diagram only works with up to 4 vectors
+
+library(ggvenn)
+ggvenn(sps_groups_1)
+
+pdf(paste0("/eos/jeodpp/home/users/rotllxa/weeds/", "VennDiagr_3_IndicatorSp.pdf"),
+    width = 8, height = 8)
+
+ggvenn(sps_groups_2, 
+       #show_elements = TRUE)
+       show_elements = FALSE,
+       text_size = 6,
+       )
+
+dev.off()
+
+
+
+
+# Heatmap:
+library(RVenn)
+sps_groups_rvenn <- Venn(sps_groups)
+
+
+pdf(paste0("/eos/jeodpp/home/users/rotllxa/weeds/", "heatmap_IndicatorSp.pdf"),
+    width = 15, height = 25)
+
+setmap(sps_groups_rvenn, element_clustering = FALSE, set_clustering = FALSE,
+       title = "")
+
+dev.off()
+
+
+
+# with ggplot
+
+library(reshape2)
+sps_groups_df <- melt(sps_groups)
+names(sps_groups_df) <- c("Species", "Maize_share")
+head(sps_groups_df)
+
+library(forcats)
+
+pdf(paste0("/eos/jeodpp/home/users/rotllxa/weeds/", "heatmap_IndicatorSp_2.pdf"),
+    width = 15, height = 30)
+
+sps_groups_df %>%
+  mutate(Species = fct_reorder(Species, desc(Species))) %>% 
+  ggplot(aes(Maize_share, Species)) + 
+  geom_tile(aes(fill = Maize_share), colour = "white", show.legend = FALSE) 
+dev.off()
+
+
+
+# UpSet plot:
+
+#If you use an UpSet figure in a publication, please cite the original paper:
+#  Alexander Lex, Nils Gehlenborg, Hendrik Strobelt, Romain Vuillemot, Hanspeter Pfister. UpSet: Visualization of Intersecting Sets IEEE Transactions on Visualization and Computer Graphics (InfoVis), 20(12): 1983--1992, doi:10.1109/TVCG.2014.2346248, 2014.
+#If you created an UpSet figure with UpSetR, please also cite the UpSetR paper:
+#  Jake R. Conway, Alexander Lex, Nils Gehlenborg. UpSetR: An R Package For The Visualization Of Intersecting Sets And Their Properties Bioinformatics, 33(18): 2938-2940, doi:10.1093/bioinformatics/btx364, 2017.
+
+library(UpSetR)
+
+pdf(paste0("/eos/jeodpp/home/users/rotllxa/weeds/", "upset_IndicatorSp.pdf"),
+    width = 10, height = 7)
+
+upset(fromList(sps_groups),
+      nsets = 9, 
+      order.by = "freq",
+      mainbar.y.label = "Intersections (Number of species)",
+      sets.x.label = "Species richness",
+      text.scale = c(1.5, 1.5, 1.5, 1.2, 1.5, 1.2),
+      queries = list(
+        list(query = intersects, params = list("[0,0.1)"), 
+             color = "green", active = TRUE)
+      )
+      )
+dev.off()
 
 
 
