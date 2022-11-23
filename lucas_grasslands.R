@@ -189,6 +189,116 @@ ggsave("point_geom_surveyors_SpRichness.png", p1)#, width = 20, height = 20, uni
 
 
 
+## Experts; normal survey ####
+
+point_geom_experts #<- paste0(dir_LucasGrassland_Momo, "/estat_e_attr_point_allattr.csv")
+
+
+## Experts data set (points)
+point_geom_experts <- fread(point_geom_experts)
+
+point_geom_experts
+
+nrow(point_geom_experts)   # 696
+names(point_geom_experts)  # 124
+
+table(point_geom_experts$SURVEY_GRASS_RICHNESS_SPEC27)
+# I assume that 0 means no individuals in the point; 1:10 means number of individuals; 11 means >10 individuals
+
+
+sort(unique(point_geom_experts$NUMBER_KEY_SPECIES)) # 0-17; this should be species richness in the point
+summary(point_geom_experts$NUMBER_FLOWERS_KEY_SPECIES) 
+#    Min. 1st Qu.  Median    Mean   3rd Qu.    Max. 
+#   0.00  17.00    37.50    41.31   59.00  155.00
+
+
+## Plotting Experts points
+# Gisco maps
+# https://ropengov.github.io/giscoR/
+
+eur_gisco <- gisco_get_countries(region = "Europe")
+eur_gisco
+
+eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 40, ymin = 33, ymax = 70)
+
+p <- ggplot() +
+  geom_sf(data = eur_gisco) +
+  geom_point(
+    data = point_geom_experts, 
+    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT),
+    size = 0.1,
+    color = "darkblue"
+  ) +
+  
+  theme_light() +
+  #scale_color_viridis(option = "viridis", discrete = TRUE) +
+  labs(title = "LUCAS grasslands 2018 (experts)") + #, x = "TY [°C]", y = "Txxx") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_text(size = 16))# +
+#guides(color = guide_legend("Species", override.aes = list(size = 2)))
+
+# https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
+p1 <- ggMarginal(p,
+                 #aes(colour = species),
+                 #type = "density", 
+                 type = "histogram", 
+                 #type = "densigram", 
+                 color = "darkblue",
+                 groupColour = FALSE, groupFill = FALSE)
+p1
+
+ggsave("point_geom_experts.png", p1, width = 20, height = 20, units = "cm")
+
+
+
+
+
+## Plotting by key species richness 
+
+sort(unique(point_geom_experts$NUMBER_KEY_SPECIES))
+
+point_geom_experts[, sp_richness_class := cut(point_geom_experts$NUMBER_KEY_SPECIES,
+                                                #breaks = c(0, 1, 6, 17),
+                                                breaks = c(0, 1, 8, 17),
+                                                include.lowest = TRUE,
+                                                right = FALSE)]
+sort(unique(point_geom_experts$sp_richness_class))
+
+point_geom_experts$NUMBER_KEY_SPECIES <- as.factor(point_geom_experts$NUMBER_KEY_SPECIES)
+
+
+p <- ggplot() +
+  geom_sf(data = eur_gisco) +
+  geom_point(
+    data = point_geom_experts, 
+    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT,
+        color = sp_richness_class),
+    #size = 0.1
+    size = 0.4
+  ) +
+  
+  theme_light() +
+  scale_color_viridis(option = "viridis", discrete = TRUE) +
+  labs(title = "LUCAS grasslands 2018 (experts): Key species richness") + #, x = "TY [°C]", y = "Txxx") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_text(size = 16)) +
+  guides(color = guide_legend("Key species richness classes", override.aes = list(size = 2)))
+
+# https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
+p1 <- ggMarginal(p,
+                 aes(colour = sp_richness_class),
+                 type = "density", 
+                 #type = "histogram", 
+                 #type = "densigram", 
+                 #color = "darkred",
+                 groupColour = TRUE, groupFill = TRUE)
+p1
+
+ggsave("point_geom_experts_SpRichness.png", p1, width = 20, height = 20, units = "cm")
+
+
 
 
 
@@ -260,6 +370,10 @@ if(sum(is.na(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[3, ])) == ncol(D
 
 ## is "species richness" consistent with column reported? 
 releve_point
+head(names(releve_point))
+head((releve_point))
+releve_point[2, 1]
+
 releve_point_data <- releve_point[3:nrow(releve_point), 4:ncol(releve_point)] # keeping only plants occurrences/abundances 
 releve_point_data[, 1:4]
 sort(unique(unlist(apply(releve_point_data, 2, function(x) sort(unique(x))))))
@@ -295,7 +409,7 @@ sum(kk2 < 100)
 sum(kk2 > 100)
 
 
-## list of species
+### list of species ####
 releve_point
 
 species_list_releve <- as.vector(unlist(releve_point[, 1]))
@@ -317,19 +431,152 @@ fread("species_list_releve.csv", sep = ",")
 
 
 
-apply(releve_point_data, 1, function(x) sum(!is.na(x)))
-sum(is.na(apply(releve_point_data, 1, function(x) sum(!is.na(x)))))
-
-all(as.vector(apply(releve_point_data, 1, function(x) sum(!is.na(x)))) == as.numeric(unlist(releve_point[3:nrow(releve_point), 3])))
-
-kk4 <- data.frame(releve_point$...1[-c(1:2)], as.vector(apply(releve_point_data, 1, function(x) sum(!is.na(x)))), as.numeric(unlist(releve_point[3:nrow(releve_point), 3])))
-head(kk4)
-kk4[kk4$as.vector.apply.releve_point_data..1..function.x..sum..is.na.x.... != kk4$as.numeric.unlist.releve_point.3.nrow.releve_point...3..., ]
-kk4[is.na(kk4$as.numeric.unlist.releve_point.3.nrow.releve_point...3...), ]
-
-
+#apply(releve_point_data, 1, function(x) sum(!is.na(x)))
+#sum(is.na(apply(releve_point_data, 1, function(x) sum(!is.na(x)))))
+#
+#all(as.vector(apply(releve_point_data, 1, function(x) sum(!is.na(x)))) == as.numeric(unlist(releve_point[3:nrow(releve_point), 3])))
+#
+#kk4 <- data.frame(releve_point$...1[-c(1:2)], as.vector(apply(releve_point_data, 1, function(x) sum(!is.na(x)))), as.numeric(unlist(releve_point[3:nrow(releve_point), 3])))
+#head(kk4)
+#kk4[kk4$as.vector.apply.releve_point_data..1..function.x..sum..is.na.x.... != kk4$as.numeric.unlist.releve_point.3.nrow.releve_point...3..., ]
+#kk4[is.na(kk4$as.numeric.unlist.releve_point.3.nrow.releve_point...3...), ]
 
 
+
+### Reported Species Richness ####
+head(names(releve_point))
+tail(names(releve_point))
+
+releve_point[2, 1]
+releve_point[2, ]
+
+releve_point_SpRichness <- releve_point[2, -c(1:3)]
+releve_point_SpRichness <- as.data.table(releve_point_SpRichness)
+ncol(releve_point_SpRichness)  # 728
+releve_point_SpRichness
+
+## Keeping only validated points (Momo's harmo)
+
+head(point_geom_experts[, 1])
+
+releve_valid_points <- point_geom_experts$POINT_ID
+length(releve_valid_points)  # 696
+releve_valid_points
+
+sum(releve_valid_points %in% names(releve_point_SpRichness))  # 690 (6 points missed, why?)
+sum(names(releve_point_SpRichness) %in% releve_valid_points)  # 690
+
+# Only valid points in both data sets
+releve_valid_points <- releve_valid_points[releve_valid_points %in% names(releve_point_SpRichness)]
+
+releve_point_SpRichness_valid <- releve_point_SpRichness[, .SD, .SDcols = as.character(releve_valid_points)] 
+releve_point_SpRichness_valid
+ncol(releve_point_SpRichness_valid)
+
+
+# Spatial info
+point_geom_experts
+names(point_geom_experts)
+
+library(tidyverse)
+releve_point_SpRichness_valid
+
+releve_point_SpRichness_valid <- as.data.table(pivot_longer(releve_point_SpRichness_valid, cols = everything()))
+releve_point_SpRichness_valid$name <- as.numeric(releve_point_SpRichness_valid$name)
+releve_point_SpRichness_valid
+
+releve_point_SpRichness_valid <- merge(releve_point_SpRichness_valid, 
+                                       point_geom_experts[, c("POINT_ID", "SURVEY_GRASS_GPS_LAT", "SURVEY_GRASS_GPS_LON")], 
+                                       by.x = "name", by.y = "POINT_ID", all.x = TRUE)
+releve_point_SpRichness_valid
+
+
+
+## Plotting by species richness 
+
+releve_point_SpRichness_valid$value <- as.numeric(releve_point_SpRichness_valid$value)
+sort(unique(releve_point_SpRichness_valid$value)) # 3 to 77
+
+releve_point_SpRichness_valid[, sp_richness_class := cut(releve_point_SpRichness_valid$value,
+                                                         #breaks = c(0, 1, 8, 17),
+                                                         breaks = c(3, 28, 53, 77),
+                                                         include.lowest = TRUE,
+                                                         right = FALSE)]
+releve_point_SpRichness_valid
+sort(unique(releve_point_SpRichness_valid$sp_richness_class))
+
+releve_point_SpRichness_valid$value <- as.factor(releve_point_SpRichness_valid$value)
+
+
+p <- ggplot() +
+  geom_sf(data = eur_gisco) +
+  geom_point(
+    data = releve_point_SpRichness_valid, 
+    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT,
+        color = sp_richness_class),
+    #size = 0.1
+    size = 0.4
+  ) +
+  
+  theme_light() +
+  scale_color_viridis(option = "viridis", discrete = TRUE) +
+  labs(title = "LUCAS grasslands 2018 (experts): All species richness") + #, x = "TY [°C]", y = "Txxx") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_text(size = 16)) +
+  guides(color = guide_legend("All species richness classes", override.aes = list(size = 2)))
+
+# https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
+p1 <- ggMarginal(p,
+                 aes(colour = sp_richness_class),
+                 type = "density", 
+                 #type = "histogram", 
+                 #type = "densigram", 
+                 #color = "darkred",
+                 groupColour = TRUE, groupFill = TRUE)
+p1
+
+ggsave("point_geom_experts_releve_SpRichness.png", p1, width = 20, height = 20, units = "cm")
+
+
+
+### Comparing key sp richness with total richness #### 
+
+releve_point_SpRichness_valid
+point_geom_experts#$NUMBER_KEY_SPECIES
+
+releve_point_SpRichness_valid <- merge(releve_point_SpRichness_valid, 
+                                       point_geom_experts[, c("POINT_ID", "NUMBER_KEY_SPECIES")], 
+                                       by.x = "name", by.y = "POINT_ID", all.x = TRUE)
+releve_point_SpRichness_valid
+
+setnames(releve_point_SpRichness_valid, old = c("value", "NUMBER_KEY_SPECIES"), new = c("All_SpRichness", "Key_SpRichness"))
+releve_point_SpRichness_valid
+
+releve_point_SpRichness_valid$All_SpRichness <- as.numeric(releve_point_SpRichness_valid$All_SpRichness)
+releve_point_SpRichness_valid$Key_SpRichness <- as.numeric(releve_point_SpRichness_valid$Key_SpRichness)
+
+p1 <- ggplot(releve_point_SpRichness_valid,
+             aes(x = All_SpRichness, y = Key_SpRichness)) + 
+             #aes(x = Key_SpRichness, y = All_SpRichness )) + 
+  geom_point()+
+  ggpubr::stat_cor(method = "pearson", label.x = 15, label.y = 15) +
+  #geom_smooth(method = "lm")
+  #coord_fixed(ratio = 1) +
+  geom_smooth(method = "lm") +
+  theme_light() +
+  labs(title = "LUCAS grasslands 2018 (experts): Key Species vs. All Species Richness") +  #, x = "TY [°C]", y = "Txxx") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+ggsave("point_geom_experts_SpRichness_AllKey.png", p1, width = 20, height = 20, units = "cm")
+
+
+cor(releve_point_SpRichness_valid[, c(2, 6)], method = c("pearson"))   # 0.77
+cor(releve_point_SpRichness_valid[, c(2, 6)], method = c("spearman"))  # 0.78
+
+
+
+#
 
 
 
@@ -361,10 +608,10 @@ point_surveyors
 
 
 # Buffering
+sf::st_crs(point_surveyors)
+
 point_surveyors_buf <- st_buffer(point_surveyors, dist = 50)
 point_surveyors_buf
-
-
 
 
 
@@ -392,10 +639,27 @@ t0
 occs_lucas_50 <- st_join(point_surveyors_buf, occs_sf)
 Sys.time() - t0
 
-occs_lucas_50
+
+st_write(obj = occs_lucas_50, dsn = "occs_lucas_50.shp", driver = "ESRI Shapefile", append = FALSE)
+occs_lucas_50_dt
 
 
 occs_lucas_50_dt <- as.data.table(occs_lucas_50)
 occs_lucas_50_dt
 
-nrow(occs_lucas_50_dt)
+write.csv(occs_lucas_50_dt, "occs_lucas_50_dt.csv", row.names = FALSE)
+
+
+occs_lucas_50_dt
+nrow(occs_lucas_50_dt)  # 322
+names(occs_lucas_50_dt)
+
+head(occs_lucas_50_dt$POINT_ID)
+length(unique(occs_lucas_50_dt$POINT_ID))  # 320
+
+
+
+occs_lucas_50_dt[duplicated(occs_lucas_50_dt$POINT_ID), 1]
+
+occs_lucas_50_dt[occs_lucas_50_dt$POINT_ID == 41002774, ]
+
