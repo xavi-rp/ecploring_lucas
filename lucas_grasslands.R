@@ -1,11 +1,18 @@
 
 
 library(data.table)
-library(devtools)
+#library(tidyr)
+#library(devtools)
 #install_github("xavi-rp/PreSPickR", 
 #               ref = "v2", 
 #               INSTALL_opts = c("--no-multiarch"))  # https://github.com/rstudio/renv/issues/162
-library(PreSPickR)
+#library(PreSPickR)
+library(raster)
+library(giscoR)
+library(sf)
+library(tidyverse)
+
+
 
 #sessionInfo()
 
@@ -39,7 +46,7 @@ point_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/estat_s_attr_point_all
 # Line geometries with all LUCAS Grassland attributes minus releve - 
 line_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/estatdb_allattr_s_transects.kml")
 # Expert point geometries all LUCAS Grassland attributes minus releve - 
-point_geom_experts <- paste0(dir_LucasGrassland_Momo, "/estat_e_attr_point_allattr.csv")
+point_geom_experts <- paste0(dir_LucasGrassland_Momo, "/estat_e_attr_point_allattr_new.csv")
 
 
 ## Surveyors data set (points)
@@ -94,7 +101,7 @@ library(dplyr)
 eur_gisco <- gisco_get_countries(region = "Europe")
 eur_gisco
 
-eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 40, ymin = 33, ymax = 70)
+eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 32, ymin = 33, ymax = 70)
 
 p <- ggplot() +
   geom_sf(data = eur_gisco) +
@@ -199,8 +206,11 @@ point_geom_experts <- fread(point_geom_experts)
 
 point_geom_experts
 
-nrow(point_geom_experts)   # 696
-names(point_geom_experts)  # 124
+nrow(point_geom_experts)   # 605
+names(point_geom_experts)  # 124+2
+
+# EUNIS habitat classification
+sort(unique(point_geom_experts$SURVEY_GRASS_EUNIS_HABITAT))
 
 table(point_geom_experts$SURVEY_GRASS_RICHNESS_SPEC27)
 # I assume that 0 means no individuals in the point; 1:10 means number of individuals; 11 means >10 individuals
@@ -425,9 +435,10 @@ species_list_releve <- gsub("  ", " ", species_list_releve)
 species_list_releve
 
 species_list_releve <- as.data.table(species_list_releve)
+species_list_releve
 
 write.csv(species_list_releve, "species_list_releve.csv", row.names = FALSE, quote = FALSE)
-fread("species_list_releve.csv", sep = ",")
+species_list_releve <- fread("species_list_releve.csv", sep = ",")
 
 
 
@@ -460,11 +471,11 @@ releve_point_SpRichness
 head(point_geom_experts[, 1])
 
 releve_valid_points <- point_geom_experts$POINT_ID
-length(releve_valid_points)  # 696
+length(releve_valid_points)  # 605
 releve_valid_points
 
-sum(releve_valid_points %in% names(releve_point_SpRichness))  # 690 (6 points missed, why?)
-sum(names(releve_point_SpRichness) %in% releve_valid_points)  # 690
+sum(releve_valid_points %in% names(releve_point_SpRichness))  # 599 (6 points missed, why?)
+sum(names(releve_point_SpRichness) %in% releve_valid_points)  # 599
 
 # Only valid points in both data sets
 releve_valid_points <- releve_valid_points[releve_valid_points %in% names(releve_point_SpRichness)]
@@ -662,4 +673,1150 @@ length(unique(occs_lucas_50_dt$POINT_ID))  # 320
 occs_lucas_50_dt[duplicated(occs_lucas_50_dt$POINT_ID), 1]
 
 occs_lucas_50_dt[occs_lucas_50_dt$POINT_ID == 41002774, ]
+
+
+
+
+
+
+## SDMs for all species ####
+
+
+### Species from releve ####
+
+releve_valid_points
+length(releve_valid_points)
+
+#releve_point_data
+#ncol(releve_point_data)
+
+if(sum(is.na(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[3, ])) == ncol(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point)) 
+  releve_point_sp <- DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[-3, ]
+
+releve_point_sp <- releve_point_sp[-c(1:2), ]
+ncol(releve_point_sp)
+names(releve_point_sp)[1]
+
+is.character(names(releve_point_sp)[1])
+
+releve_point_data_valid <- releve_point_sp[names(releve_point_sp) %in% c(names(releve_point_sp)[1], releve_valid_points)]
+ncol(releve_point_data_valid)
+releve_point_data_valid
+
+
+# rarity (more common species -appearing in more points; not more abundant -appearing more often within a point)
+
+releve_point_data_valid$num_points <- apply(releve_point_data_valid[, -1], 1, function(x) sum(!is.na(x)))
+releve_point_data_valid
+ncol(releve_point_data_valid)
+names(releve_point_data_valid)
+
+as.vector(unlist(releve_point_data_valid[1, ]))
+as.vector(unlist(releve_point_data_valid[3, ]))
+
+
+releve_sps_rarity <- as.data.table(releve_point_data_valid[, c("...1", "num_points")])
+releve_sps_rarity
+
+setkeyv(releve_sps_rarity, "num_points")
+releve_sps_rarity
+
+releve_sps_rarity[num_points == 0]
+releve_sps_rarity[num_points == 0]$...1   # 341 species appearing in 0 relev points
+
+
+
+releve_sps_rarity <- releve_sps_rarity[order(-rank(num_points))]
+releve_sps_rarity[1:100, ]
+View(releve_sps_rarity)
+
+
+
+### Subset of species from the releve to be modelled ####
+# species appearing in 50 or more points of the releve
+releve_sps_rarity_50points <- releve_sps_rarity[num_points >= 50]   # 68 species
+releve_sps_rarity_50points
+
+releve_sps_rarity_50points_sps <- sort(releve_sps_rarity_50points$...1)
+releve_sps_rarity_50points_sps
+
+
+## gathering points and coordinates
+
+releve_point_sp  # all releve points (also those with coordinates from theoretical lucas point)
+
+releve_point_sp_4modelling <- releve_point_sp %>% 
+  filter( ...1 %in% releve_sps_rarity_50points_sps) %>%
+  select(-c("type (sub = subspecies, sp = only identified to genus level)", "number of points present"))
+
+releve_point_sp_4modelling
+
+
+releve_point_sp_4modelling <- releve_point_sp_4modelling %>% 
+  pivot_longer(cols = -1) %>%
+  #filter(!is.na(value))
+  mutate(value = ifelse(is.na(value), 0, 1))
+
+releve_point_sp_4modelling <- as.data.table(releve_point_sp_4modelling)
+setnames(releve_point_sp_4modelling, c("...1", "name", "value"), c("species", "POINT_ID", "presence"))
+releve_point_sp_4modelling$POINT_ID <- as.numeric(as.character(releve_point_sp_4modelling$POINT_ID))
+
+## merging coordinates
+releve_point_sp_4modelling <- merge(releve_point_sp_4modelling,
+                                    point_geom_experts[, .SD, .SDcols = c("POINT_ID", "SURVEY_GRASS_GPS_LAT", "SURVEY_GRASS_GPS_LON")],   # coordinates only for harmonized points
+                                    all.x = TRUE,
+                                    by = "POINT_ID"
+                                    )
+
+releve_point_sp_4modelling <- na.omit(releve_point_sp_4modelling)
+releve_point_sp_4modelling
+
+# some checks
+length(unique(releve_point_sp_4modelling$POINT_ID))
+length(unique(releve_point_sp_4modelling$species))
+
+table(releve_point_sp_4modelling[presence == 1, species])
+range(table(releve_point_sp_4modelling[presence == 1, species]))  # range of presences: 50 252 points/species
+range(table(releve_point_sp_4modelling[presence == 0, species]))  # range of absences: 347 549 points/species
+table(releve_point_sp_4modelling[presence == 0, species])
+
+
+write.csv(releve_point_sp_4modelling, "releve_point_sp_4modelling.csv", quote = FALSE, row.names = FALSE)
+releve_point_sp_4modelling <- fread("releve_point_sp_4modelling.csv", header = TRUE)
+
+
+## Mapping occurrences just for checking
+
+releve_point_sp_4modelling
+
+releve_point_sp_4modelling_pres <- releve_point_sp_4modelling[presence == 1, ]
+releve_point_sp_4modelling_pres
+
+
+
+# Gisco maps:   https://ropengov.github.io/giscoR/
+
+eur_gisco <- gisco_get_countries(region = "Europe")
+eur_gisco
+eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 40, ymin = 33, ymax = 70)
+
+ggplot() +
+  geom_sf(data = eur_gisco) +
+  geom_point(
+    data = releve_point_sp_4modelling_pres, 
+    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT),
+    size = 0.1,
+    color = "darkgreen"
+  ) 
+
+
+
+
+### Corine LC #### 
+
+#### CLC layers for modelling ####
+## Producing some relevant land-use variables for modelling
+
+clc_100 <- stack("/eos/jeodpp/data/base/Landcover/EUROPE/CorineLandCover/CLC2018/VER20-b2/Data/GeoTIFF/100m/clc2018_Version_20_b2.tif")
+clc_100
+
+clc_100[clc_100$clc2018 %in% c(521, 522, 523)] <- NA   # Removing marine waters
+
+
+clc_100 <- raster("clc_100_clean.tif")
+clc_100
+
+# 231: Pastures, meadows and other permanent grasslands under agricultural use
+# 321: Natural grassland
+
+
+## Aggregating Pastures and to 1km
+aggr_fun_1km <- function(x, ...) {     # returns share of grassland at 1km, from 100m grid (0 to 1)
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(231 # Pastures
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_grassl <- aggregate(x = clc_100, 
+                            fact = 10,        # from 100m to 1km
+                            fun = aggr_fun_1km, 
+                            expand = TRUE, 
+                            na.rm = TRUE, 
+                            filename = "clc_1km_pastures.tif",
+                            #filename = "",
+                            overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_pastures <- raster("clc_1km_pastures.tif")
+clc_1km_pastures
+plot(clc_1km_pastures)
+
+
+
+## Aggregating Naturarl grasslands and to 1km
+aggr_fun_1km <- function(x, ...) {     # returns share of grassland at 1km, from 100m grid (0 to 1)
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(321 # Natural grasslands
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_NatGrasslands <- aggregate(x = clc_100, 
+                            fact = 10,        # from 100m to 1km
+                            fun = aggr_fun_1km, 
+                            expand = TRUE, 
+                            na.rm = TRUE, 
+                            filename = "clc_1km_NatGrasslands.tif",
+                            #filename = "",
+                            overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_NatGrasslands <- raster("clc_1km_NatGrasslands.tif")
+clc_1km_NatGrasslands
+plot(clc_1km_NatGrasslands)
+
+
+
+## Aggregating arable land to 1km
+aggr_fun_1km <- function(x, ...) {     # returns share of arable at 1km, from 100m grid (0 to 1)
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(211,
+                             212,
+                             213
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_ArableLand <- aggregate(x = clc_100, 
+                            fact = 10,        # from 100m to 1km
+                            fun = aggr_fun_1km, 
+                            expand = TRUE, 
+                            na.rm = TRUE, 
+                            filename = "clc_1km_ArableLand.tif",
+                            #filename = "",
+                            overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_ArableLand <- raster("clc_1km_ArableLand.tif")
+clc_1km_ArableLand
+plot(clc_1km_ArableLand)
+
+
+
+
+## Aggregating  permanent crops to 1km
+aggr_fun_1km <- function(x, ...) {     # returns share of grassland at 1km, from 100m grid (0 to 1)
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(221,
+                             222,
+                             223
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_PermanentCrops <- aggregate(x = clc_100, 
+                            fact = 10,        # from 100m to 1km
+                            fun = aggr_fun_1km, 
+                            expand = TRUE, 
+                            na.rm = TRUE, 
+                            filename = "clc_1km_PermanentCrops.tif",
+                            #filename = "",
+                            overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_PermanentCrops <- raster("clc_1km_PermanentCrops.tif")
+clc_1km_PermanentCrops
+plot(clc_1km_PermanentCrops)
+
+
+
+
+## Aggregating  Heterogeneous agricultural areas to 1km
+aggr_fun_1km <- function(x, ...) {     # returns share of Heterogeneous agricultural areas at 1km, from 100m grid (0 to 1)
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(241,
+                             242,
+                             243,
+                             244
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_HeterogAgricAreas <- aggregate(x = clc_100, 
+                                       fact = 10,        # from 100m to 1km
+                                       fun = aggr_fun_1km, 
+                                       expand = TRUE, 
+                                       na.rm = TRUE, 
+                                       filename = "clc_1km_HeterogAgricAreas.tif",
+                                       #filename = "",
+                                       overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_HeterogAgricAreas <- raster("clc_1km_HeterogAgricAreas.tif")
+clc_1km_HeterogAgricAreas
+plot(clc_1km_HeterogAgricAreas)
+
+
+
+
+
+
+## Aggregating  Forest areas to 1km
+aggr_fun_1km <- function(x, ...) {     
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(311,
+                             312,
+                             313
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_Forest <- aggregate(x = clc_100, 
+                            fact = 10,        # from 100m to 1km
+                            fun = aggr_fun_1km, 
+                            expand = TRUE, 
+                            na.rm = TRUE, 
+                            filename = "clc_1km_Forest.tif",
+                            #filename = "",
+                            overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_Forest <- raster("clc_1km_Forest.tif")
+clc_1km_Forest
+plot(clc_1km_Forest)
+
+
+
+
+
+## Aggregating  Schrubland areas to 1km
+aggr_fun_1km <- function(x, ...) {     
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(322,
+                             323,
+                             324
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_shrublands <- aggregate(x = clc_100, 
+                                fact = 10,        # from 100m to 1km
+                                fun = aggr_fun_1km, 
+                                expand = TRUE, 
+                                na.rm = TRUE, 
+                                filename = "clc_1km_shrublands.tif",
+                                #filename = "",
+                                overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_shrublands <- raster("clc_1km_shrublands.tif")
+clc_1km_shrublands
+plot(clc_1km_shrublands)
+
+
+
+
+
+## Aggregating Open spaces with no vegetation to 1km
+aggr_fun_1km <- function(x, ...) {     
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(331,
+                             332,
+                             333,
+                             334,
+                             335
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_OpenNoVeg <- aggregate(x = clc_100, 
+                                fact = 10,        # from 100m to 1km
+                                fun = aggr_fun_1km, 
+                                expand = TRUE, 
+                                na.rm = TRUE, 
+                                filename = "clc_1km_OpenNoVeg.tif",
+                                #filename = "",
+                                overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_OpenNoVeg <- raster("clc_1km_OpenNoVeg.tif")
+clc_1km_OpenNoVeg
+plot(clc_1km_OpenNoVeg)
+
+
+
+
+
+
+
+## Aggregating Inland wetlands to 1km
+aggr_fun_1km <- function(x, ...) {     
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(411,
+                             412
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_InlandWet <- aggregate(x = clc_100, 
+                               fact = 10,        # from 100m to 1km
+                               fun = aggr_fun_1km, 
+                               expand = TRUE, 
+                               na.rm = TRUE, 
+                               filename = "clc_1km_InlandWet.tif",
+                               #filename = "",
+                               overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_InlandWet <- raster("clc_1km_InlandWet.tif")
+clc_1km_InlandWet
+plot(clc_1km_InlandWet)
+
+
+
+
+## Aggregating Coastal wetlands to 1km
+aggr_fun_1km <- function(x, ...) {     
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(421,
+                             422,
+                             423
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_CoastalWet <- aggregate(x = clc_100, 
+                               fact = 10,        # from 100m to 1km
+                               fun = aggr_fun_1km, 
+                               expand = TRUE, 
+                               na.rm = TRUE, 
+                               filename = "clc_1km_CoastalWet.tif",
+                               #filename = "",
+                               overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_CoastalWet <- raster("clc_1km_CoastalWet.tif")
+clc_1km_CoastalWet
+plot(clc_1km_CoastalWet)
+
+
+
+## Aggregating Inland waters to 1km
+aggr_fun_1km <- function(x, ...) {     
+  if (all(is.na(x))){
+    gr_share <- NA
+  }else{
+    gr_share <- sum(x %in% c(511,
+                             512
+                             )#& 
+                    #!is.na(x)
+                    , na.rm = TRUE) / 100
+  }
+  return(gr_share)
+}
+
+
+
+t0 <- Sys.time()
+clc_1km_InlandWaters <- aggregate(x = clc_100, 
+                               fact = 10,        # from 100m to 1km
+                               fun = aggr_fun_1km, 
+                               expand = TRUE, 
+                               na.rm = TRUE, 
+                               filename = "clc_1km_InlandWaters.tif",
+                               #filename = "",
+                               overwrite = TRUE)
+Sys.time() - t0
+
+#clc_1km_InlandWaters <- raster("clc_1km_InlandWaters.tif")
+clc_1km_InlandWaters
+plot(clc_1km_InlandWaters)
+
+
+
+
+
+#### Grassland mask ####
+## The purpose of this part was to make an European grassland layer (1km grid) to be used as a mask for modelling
+## But almost half of the Lucas grassland (2018) releve points were outside this layer because the CLC-100m is not
+## fine-grained enough to discriminate small grassland patches within other classes (e.g. forest).
+## If trying to include all the lucas releve points in the mask, almost the whole European land was in the mask, 
+## making no sense to use it 
+
+run_this <- "no"
+if(run_this == "yes"){
+  #clc_100 <- stack("/eos/jeodpp/data/base/Landcover/EUROPE/CorineLandCover/CLC2018/VER20-b2/Data/GeoTIFF/100m/clc2018_Version_20_b2.tif")
+  #clc_100
+  
+  clc_100 <- raster("clc_100_clean.tif")
+  
+  # 231: Pastures, meadows and other permanent grasslands under agricultural use
+  # 321: Natural grassland
+  
+  ## Aggregating grasslands to 1km
+  
+  aggr_fun_1km <- function(x, ...) {     # returns share of grassland at 1km, from 100m grid (0 to 1)
+    if (all(is.na(x))){
+      gr_share <- NA
+    }else{
+      gr_share <- sum(x %in% c(231, # Pastures
+                               321 # Natural grassland
+      )#& 
+      #!is.na(x)
+      , na.rm = TRUE) / 100
+    }
+    return(gr_share)
+  }
+  
+  
+  
+  t0 <- Sys.time()
+  clc_1km_grassl_share <- aggregate(x = clc_100, 
+                              fact = 10,        # from 100m to 1km
+                              fun = aggr_fun_1km, 
+                              expand = TRUE, 
+                              na.rm = TRUE, 
+                              filename = "clc_1km_grassl_share.tif",
+                              #filename = "",
+                              overwrite = TRUE)
+  Sys.time() - t0
+  
+  #writeRaster(clc_1km_grassl, "clc_1km_grassl_share.tif", overwrite = TRUE)
+  
+  clc_1km_grassl <- raster("clc_1km_grassl_share.tif")
+  clc_1km_grassl
+  
+  sort(unique(getValues(clc_1km_grassl)))
+  plot(clc_1km_grassl)
+  
+  
+  
+  ## Making a mask for the AOI for modelling (grasslands + other 1km pixels with agricultural and/or (semi)natural areas)
+  # Some of the lucas grassland points 2018 still might remain out of this mask. These points should be discarded from the study
+  
+  aggr_fun_1km <- function(x, ...) {     # returns share of grassland at 1km, from 100m grid (0 to 1)
+    if (all(is.na(x))){
+      gr_share <- NA
+    }else{
+      gr_share <- sum(x %in% c(231, # Pastures
+                               321, # Natural grassland
+                               211, 212, 213, 221, 222, 223, 241, 242, 243, 244, # Agricultural areas
+                               311, 312, 313, 322, 323, 324, 333#, # Forest and seminatural areas
+                               #112, # Discontinuous urban fabric
+                               #121, # Industrial or commercial units and public facilities
+                               #122, # Road and rail networks and associated land
+                               #411, # Inland marshes
+                               #511, # Water courses
+                               #512  # Water bodies
+      )#& 
+      #!is.na(x)
+      , na.rm = TRUE) / 100
+    }
+    return(gr_share)
+  }
+  
+  
+  t0 <- Sys.time()
+  clc_1km_grassl_mask <- aggregate(x = clc_100, 
+                                   fact = 10,        # from 100m to 1km
+                                   fun = aggr_fun_1km, 
+                                   expand = TRUE, 
+                                   na.rm = TRUE, 
+                                   #filename = "clc_1km_grassl_mask.tif",
+                                   filename = "",
+                                   overwrite = TRUE)
+  Sys.time() - t0
+  
+  writeRaster(clc_1km_grassl_mask, "clc_1km_grassl_mask.tif", overwrite = TRUE)
+  
+  clc_1km_grassl_mask <- raster("clc_1km_grassl_mask.tif")
+  sort(unique(getValues(clc_1km_grassl_mask$clc_1km_grassl_mask)))
+  table(getValues(clc_1km_grassl_mask$clc_1km_grassl_mask))
+  
+  ## reclassifying from grassland share to grassland/no grassland
+  
+  # We will use this layer as a mask for the area of interest (AOI) for modelling
+  # For this reason, we keep as grasslands all 1km pixels with at least one 100m pixels of relevant classes
+  
+  clc_1km_grassl_mask[clc_1km_grassl_mask$clc_1km_grassl_mask < 0.01] <- 0
+  clc_1km_grassl_mask[clc_1km_grassl_mask$clc_1km_grassl_mask >= 0.01] <- 1
+  
+  plot(clc_1km_grassl_mask)
+  
+  
+  wkt <- sf::st_crs(4326)[[2]]
+  clc_1km_grassl_wgs84 <- projectRaster(clc_1km_grassl,
+                                        crs = wkt,
+                                        method = "ngb")
+  clc_1km_grassl_wgs84
+  unique(getValues(clc_1km_grassl))
+  unique(getValues(clc_1km_grassl_wgs84))
+  
+  
+  # Plotting with ggplot2
+  clc_1km_grassl_pts <- rasterToPoints(clc_1km_grassl_wgs84, spatial = TRUE)
+  head(clc_1km_grassl_pts)
+  
+  clc_1km_grassl_df <- data.frame(clc_1km_grassl_pts)
+  head(clc_1km_grassl_df)
+  nrow(clc_1km_grassl_df)
+  
+  clc_1km_grassl_df_1 <- clc_1km_grassl_df %>% mutate(across(c(x, y), round, digits = 4))
+  head(clc_1km_grassl_df_1)
+  
+  
+  #jpeg("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/grassland_layer_1km_releves.jpg")
+  ggplot() +
+    geom_raster(data = clc_1km_grassl_df_1, aes(x, y, fill = clc_1km_grassl,)) +
+    scale_fill_continuous(trans = 'reverse') +
+    geom_point(
+      data = releve_point_sp_4modelling_pres, 
+      aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT),
+      size = 0.1,
+      color = "red")
+  
+  #dev.off()
+  
+  
+  
+  ## How many releve points fall in CLC grasslands layer??
+  
+  releve_point_sp_4modelling_pres_sf <- st_as_sf(as.data.frame(releve_point_sp_4modelling_pres), 
+                                                 coords = c("SURVEY_GRASS_GPS_LON", "SURVEY_GRASS_GPS_LAT"), 
+                                                 crs = 4326)#, agr = "constant")
+  releve_point_sp_4modelling_pres_sf
+  
+  clc_1km_grassl_releve <- as.data.table(extract(clc_1km_grassl_wgs84,
+                                                 releve_point_sp_4modelling_pres_sf, 
+                                                 sp = TRUE))
+  clc_1km_grassl_releve
+  
+  clc_1km_grassl_releve <- clc_1km_grassl_releve[!duplicated(clc_1km_grassl_releve$POINT_ID), ]
+  clc_1km_grassl_releve
+  
+  # The following was when using only managed grasslands from CLC (class 231)
+  #sum(clc_1km_grassl_releve$clc_1km_grassl == 0)  # threshold = 0.3, 454; threshold = 0.2, 412; threshold = 0.01, 331   
+  #sum(clc_1km_grassl_releve$clc_1km_grassl == 1)  # threshold = 0.3, 124; threshold = 0.2, 166; threshold = 0.01, 247
+  ## even keeping all 1km pixels with only 1 CLC_100m = grassland (class 231), more than half of the 
+  ## releve points with occurrences to be modelled are outside CLC grassland
+  ## probably there are other CLC classes which also contain grasslands 
+  ## (check https://land.copernicus.eu/user-corner/technical-library/corine-land-cover-nomenclature-guidelines/html) 
+  
+  
+  sum(clc_1km_grassl_releve$clc_1km_grassl == 0)  # threshold = 0.01, 275   
+  sum(clc_1km_grassl_releve$clc_1km_grassl == 1)  # threshold = 0.01, 303
+  
+  
+  ## Check classes for the points outside grasslands
+  clc_1km_grassl_releve_pointOut <- clc_1km_grassl_releve[clc_1km_grassl_releve$clc_1km_grassl == 0, ]
+  write.csv(clc_1km_grassl_releve_pointOut, "clc_1km_grassl_releve_pointOut.csv", quote = FALSE, row.names = FALSE)
+  
+  
+  clc_1km_grassl_releve_pointOut_sf <- st_as_sf(as.data.frame(clc_1km_grassl_releve_pointOut), 
+                                                coords = c("coords.x1", "coords.x2"), 
+                                                crs = 4326)#, agr = "constant")
+  
+  clc_1km_grassl_releve_pointOut_CLC100 <- as.data.table(extract(clc_100,
+                                                                 clc_1km_grassl_releve_pointOut_sf, 
+                                                                 sp = TRUE))
+  clc_1km_grassl_releve_pointOut_CLC100
+  sort(unique(clc_1km_grassl_releve_pointOut_CLC100$clc2018))
+  table(clc_1km_grassl_releve_pointOut_CLC100$clc2018)
+  
+  
+} # end of 'run_this'
+
+
+
+
+
+
+### Predictors ####
+
+## Bioclimatic variables from WorldClim 
+preds_dir <- "/eos/jeodpp/home/users/rotllxa/European_butterflies_SDMs_data/"
+
+worldclim_all <- stack(paste0(preds_dir, "worldclim_all.tif"))
+worldclim_all
+names(worldclim_all)
+
+worldclim_all_names <- c("wc2.1_30s_bio_1", "wc2.1_30s_bio_10", "wc2.1_30s_bio_11", "wc2.1_30s_bio_12", "wc2.1_30s_bio_13", "wc2.1_30s_bio_14",
+                         "wc2.1_30s_bio_15", "wc2.1_30s_bio_16", "wc2.1_30s_bio_17", "wc2.1_30s_bio_18", "wc2.1_30s_bio_19", "wc2.1_30s_bio_2",
+                         "wc2.1_30s_bio_3", "wc2.1_30s_bio_4", "wc2.1_30s_bio_5", "wc2.1_30s_bio_6", "wc2.1_30s_bio_7", "wc2.1_30s_bio_8",
+                         "wc2.1_30s_bio_9",  "wc2.1_30s_elev") 
+worldclim_all_names <- gsub("wc2.1_30s_", "", worldclim_all_names)
+names(worldclim_all) <- worldclim_all_names
+
+names(worldclim_all)
+
+
+## Corine variables
+clc_vars <- list.files()[grepl("clc_1km_", list.files())]
+clc_vars
+clc_vars <- clc_vars[!grepl(".aux", clc_vars)]
+clc_vars <- clc_vars[!grepl(".csv", clc_vars)]
+clc_vars <- clc_vars[!grepl("mask", clc_vars)]
+clc_vars <- clc_vars[!grepl("_grassl", clc_vars)]
+
+clc_vars
+
+clc_vars_all <- stack(clc_vars)
+clc_vars_all
+
+
+## Reprojecting Worldclim to LAEA
+
+worldclim_all_laea <- projectRaster(worldclim_all, crs = crs(clc_vars_all),
+                                    filename = paste0(preds_dir, "worldclim_all_laea.tif"))
+
+worldclim_all_laea
+#writeRaster(worldclim_all_laea, filename = paste0(preds_dir, "worldclim_all_laea.tif"))
+
+worldclim_all_laea <- stack(paste0(preds_dir, "worldclim_all_laea.tif"))
+
+
+
+## Cropping rasters
+worldclim_all_laea <- crop(worldclim_all_laea, clc_vars_all)
+worldclim_all_laea
+
+
+## Resample
+worldclim_all_laea <- resample(worldclim_all_laea, clc_vars_all)
+
+names(worldclim_all_laea) <- worldclim_all_names
+worldclim_all_laea
+clc_vars_all
+
+#plot(worldclim_all_laea_2[[1]])
+#
+#writeRaster(worldclim_all_laea_2[[4]], "worldclim_all_laea_2_bio12.tif")
+#writeRaster(worldclim_all_laea[[4]], "worldclim_all_laea_bio12.tif")
+#writeRaster(worldclim_all[[4]], "worldclim_all_bio12.tif")
+#plot(clc_vars_all[[1]])
+
+
+
+## WorldClim + Corine
+
+#all_vars <- stack(worldclim_all_laea, clc_vars_all)
+#writeRaster(all_vars,"all_vars.grd", format = "raster", overwrite = TRUE)
+
+all_vars <- brick("all_vars.grd")
+all_vars
+
+all_vars <- crop(all_vars, extent(2500000, 6000000, 1400000, 5500000))
+plot(all_vars[[4]])
+
+
+
+
+### Modelling with MaxEnt ####
+
+
+all_vars
+
+releve_point_sp_4modelling_sf <- st_as_sf(releve_point_sp_4modelling, coords = c("SURVEY_GRASS_GPS_LON", "SURVEY_GRASS_GPS_LAT"), crs = 4326)
+releve_point_sp_4modelling_laea <- st_transform(releve_point_sp_4modelling_sf, crs = st_crs(all_vars))
+releve_point_sp_4modelling_laea_coords <- data.table(st_coordinates(releve_point_sp_4modelling_laea))
+releve_point_sp_4modelling_laea <- cbind(data.table(releve_point_sp_4modelling_laea), releve_point_sp_4modelling_laea_coords)
+
+releve_point_sp_4modelling_laea
+
+
+releve_point_sp_4modelling_pres_laea <- releve_point_sp_4modelling_laea[presence == 1, ]
+
+length(unique(releve_point_sp_4modelling_pres_laea$POINT_ID))  # 578
+length(unique(releve_point_sp_4modelling_pres_laea$species))  # 68
+sort(table(releve_point_sp_4modelling_pres_laea$species))
+
+
+
+
+info_models_maxent <- c()
+
+# Threshold to use for converting to presence/absence
+# Options: kappa,  spec_sens, no_omission, prevalence, equal_sens_spec, sensitivity
+#threshold2use <- "sensitivity"    # deffault 0.9
+threshold2use <- "no_omission"    # keeping all presences
+
+Sys.time()
+
+taxons <- unique(releve_point_sp_4modelling_pres$species)
+
+for (t in taxons){
+  #print(t)
+  #t <- taxons[1]
+  t0 <- Sys.time()
+  print(t0)
+  #sps <- spcies[spcies$taxons == t, "sps"]
+  sps <- t
+  
+  print(paste0("running... ", sps))
+  
+  dir2save_maxent <- paste0("models_maxent_", t, "/")
+  if(!dir.exists(paste0("models_maxent_", t))) {
+    dir.create(dir2save_maxent)
+  }
+  
+  dir2save_presences <- paste0("pres4modelling", "/")
+  if(!dir.exists(paste0("pres4modelling"))) {
+    dir.create(dir2save_presences)
+  }
+  
+  occs_i <- occs_all[occs_all$sp2 %in% t, c("decimalLongitude", "decimalLatitude")]
+  occurrences_raw <- nrow(occs_i)
+  
+  occs_i_shp <- SpatialPointsDataFrame(coords = occs_i[, c("decimalLongitude", "decimalLatitude")],
+                                       data = data.frame(sp = rep(1, nrow(occs_i))),
+                                       proj4string = CRS("+init=EPSG:4326"))
+  #names(occs_i_shp) <- t
+  occs_i_rstr <- rasterize(occs_i_shp, worldclim_all[[1]], field = "sp", background = 0)
+  #names(occs_i_rstr) <- t
+  #occs_i_rstr <- occs_i_rstr[[2]]
+  occs_i_rstr <- mask(occs_i_rstr, worldclim_all[[1]])
+  
+  #assign(paste0(t, "_rstr"), occs_i_rstr)
+  #print(sum(getValues(occs_i_rstr) == 1, na.rm = T))
+  
+  
+  ## occurrences for training/testing
+  sps_data <- stack(occs_i_rstr, worldclim_all) 
+  sps_data <- as.data.table(as.data.frame(sps_data))
+  sps_data[, raster_position := 1:nrow(sps_data)]
+  
+  # data set for presences
+  sps_data_presences <- sps_data[layer == 1, ]
+  sps_data_presences <- sps_data_presences[complete.cases(sps_data_presences), ]
+  occurrences_1km <- nrow(sps_data_presences)
+  rm(sps_data); gc()
+  
+  # data set for pseudo-absences
+  sps_data_absences <- as.data.table(as.data.frame(raster::extract(worldclim_all, bckgr, cellnumbers = TRUE)))
+  sps_data_absences <- sps_data_absences[!sps_data_absences$cells %in% sps_data_presences$raster_position, ]
+  names(sps_data_absences)
+  
+  nrow(sps_data_presences)
+  nrow(sps_data_absences)
+  
+  prop4test <- 0.3
+  prop4train <- 1 - prop4test
+  
+  sps_data_presences_train <- sample_n(sps_data_presences, ceiling(nrow(sps_data_presences) * prop4train))
+  sps_data_presences_test <- sps_data_presences[!sps_data_presences$raster_position %in% sps_data_presences_train$raster_position, ]
+  
+  write.csv(sps_data_presences_train, paste0(dir2save_presences, "/sps_data_presences_train_", t, ".csv"), row.names = FALSE)
+  write.csv(sps_data_presences_test, paste0(dir2save_presences, "/sps_data_presences_test_", t, ".csv"), row.names = FALSE)
+  write.csv(sps_data_absences, paste0(dir2save_presences, "/sps_data_absences_", t, ".csv"), row.names = FALSE)
+  
+  #sps_data_presences_train <- fread(paste0(dir2save_presences, "/sps_data_presences_train_", t, ".csv"), header = TRUE)
+  #sps_data_presences_test <- fread(paste0(dir2save_presences, "/sps_data_presences_test_", t, ".csv"), header = TRUE)
+  #sps_data_absences <- fread(paste0(dir2save_presences, "/sps_data_absences_", t, ".csv"), header = TRUE)  
+  
+  
+  ## Running ENMeval (https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0.0-vignette.html)
+  ## Including a tryCatch to avoid stop process if there's an error because of a bug with "H" transformation or something
+  
+  library(dismo)
+  library(ENMeval)
+  
+  dir_func <- function(sps_data_presences, worldclim_all, sps_data_absences, fc){ # to avoid stop modelling if low number of background points or other errors
+    res <- tryCatch(
+      {
+        library(dismo)
+        library(ENMeval)
+        #modl1 <- ENMevaluate(occs = sps_data_presences[1:3000, .SD, .SDcols = names(worldclim_all)], 
+        modl1 <- ENMevaluate(occs = sps_data_presences_train[, .SD, .SDcols = names(worldclim_all)], 
+                             envs = NULL, 
+                             bg = sps_data_absences[, .SD, .SDcols = names(worldclim_all)], 
+                             algorithm = 'maxnet', 
+                             #partitions = 'block', 
+                             partitions = "testing",
+                             #occs.testing = sps_data_presences[3001:3750, .SD, .SDcols = names(worldclim_all)],  # occurrences for testing; only when partitions = 'testing'
+                             occs.testing = sps_data_presences_test[, .SD, .SDcols = names(worldclim_all)],  # occurrences for testing; only when partitions = 'testing'
+                             tune.args = list(
+                               #fc = c("L","LQ","LQH","H"),
+                               #fc = c("L","LQ","LQH"),  # removed "H" because there is some bug in maxnet that gives error for some species
+                               #fc = c("L","LQ"),  # removed "H" and "LQH" because there is some bug in maxnet that gives error for some species
+                               #fc = c("L","LQ"),
+                               fc = fc,
+                               rm = c(1, 2, 5)
+                               #rm = 1:2
+                             ),
+                             quiet = TRUE,
+                             parallel = TRUE,
+                             #parallel = FALSE,
+                             numCores = 12
+                             #numCores = 4
+        )
+        
+      },
+      error = function(con){
+        message(con)
+        return(NULL)
+      }
+    )
+    if(exists("modl1")){ return(modl1) }else{ return(NULL) }
+  } #end of dir_func
+  
+  
+  fc_opts <- list(c("L","LQ","LQH","H"), c("L","LQ","LQH"), c("L","LQ"), "L")
+  
+  for(fc in fc_opts){
+    modl <- dir_func(sps_data_presences, worldclim_all, sps_data_absences, fc)
+    if(!is.null(modl)) break
+  }
+  
+  
+  #rm(sps_data_absences); gc()
+  modl
+  modl@results
+  #View(modl@results)
+  write.csv(modl@results, file = paste0(dir2save_maxent, "ENMeval_results_", t, ".csv"))
+  save(modl, file = paste0(dir2save_maxent, "models_", t, ".RData"))
+  #evalplot.stats(e = modl, stats = "or.mtp", color = "fc", x.var = "rm")
+  #load(paste0(dir2save_maxent, "models_", t, ".RData"), verbose = TRUE)
+  
+  occurrences_train <- nrow(modl@occs)
+  occurrences_test <- nrow(modl@occs.testing)  # none because cross-validation
+  background_points <- nrow(modl@bg)
+  
+  
+  # selecting optimal model
+  results <- eval.results(modl)
+  results
+  #View(results)
+  optimal <- results %>% filter(delta.AICc == 0)
+  optimal
+  if(nrow(optimal) > 1) optimal <- optimal[1, ]
+  
+  modl_args <- eval.models(modl)[[optimal$tune.args]]
+  modl_args$betas
+  #str(modl_args)
+  
+  #dev.off()
+  pdf(paste0(dir2save_maxent, "opt_model_RespCurves_", t, ".pdf"))
+  plot(modl_args, type = "cloglog")
+  # And these are the marginal response curves for the predictor variables wit non-zero 
+  # coefficients in our model. We define the y-axis to be the cloglog transformation, which
+  # is an approximation of occurrence probability (with assumptions) bounded by 0 and 1
+  # (Phillips et al. 2017).
+  dev.off()
+  
+  modl <- modl@models[[optimal$tune.args]]
+  gc()
+  
+  #save(modl, file = paste0(dir2save_maxent, "opt_model_", t, ".RData"))
+  
+  # making predictions
+  #worldclim_all_data <- fread("worldclim_all_data_NoCor.csv", header = TRUE)
+  #worldclim_all_data <- fread("worldclim_all_data_NoCor_070.csv", header = TRUE)
+  #worldclim_all_data <- fread("worldclim_all_data_NoCor_040.csv", header = TRUE)
+  #worldclim_all_data <- fread(paste0(preds_dir, "worldclim_all_data.csv"), header = TRUE)
+  #names(worldclim_all_data) <- names(worldclim_all)
+  #names(worldclim_all_data) <- gsub("wc2.1_30s_bio_", "worldclim_all.", names(worldclim_all_data))
+  #names(worldclim_all_data) <- gsub("wc2.1_30s_elev", "worldclim_all.20", names(worldclim_all_data))
+  #names(worldclim_all_data) <- gsub("worldclim_all", "worldclim_all", names(worldclim_all_data))
+  #worldclim_all_data <- worldclim_all_data[complete.cases(worldclim_all_data), ]
+  sps_predictions_maxent <- predict(object = modl, 
+                                    newdata = worldclim_all_data, 
+                                    clamp = TRUE,
+                                    type = c("cloglog")
+  )
+  #rm(worldclim_all_data); gc()
+  sps_predictions_maxent <- as.data.table(sps_predictions_maxent)
+  head(sps_predictions_maxent)
+  range(sps_predictions_maxent)
+  nrow(sps_predictions_maxent)
+  
+  worldclim_all_data0 <- as.data.table(as.data.frame(worldclim_all[[1]]))
+  worldclim_all_data0$raster_position <- 1:nrow(worldclim_all_data0)
+  
+  worldclim_all_data1 <- worldclim_all_data0
+  worldclim_all_data1 <- worldclim_all_data1[complete.cases(worldclim_all_data1), ]
+  
+  worldclim_all_data0 <- worldclim_all_data0[, .SD, .SDcols = "raster_position"]
+  
+  worldclim_all_data1[, predictions := sps_predictions_maxent$V1]
+  
+  
+  worldclim_all_data0 <- merge(worldclim_all_data0[, "raster_position", with = FALSE], 
+                               worldclim_all_data1[, .SD, .SDcols = c("raster_position", "predictions")], 
+                               by = "raster_position", all.x = TRUE)
+  
+  #rm(worldclim_all_data1); gc()
+  
+  sps_preds_rstr <- worldclim_all[[1]]
+  sps_preds_rstr <- setValues(sps_preds_rstr, worldclim_all_data0$predictions)
+  names(sps_preds_rstr) <- "predictions_maxent"
+  
+  #rm(worldclim_all_data0); gc()
+  
+  
+  #pdf("sps_predictions_maxent_kk.pdf", width = 20, height = 15)
+  #par(mfrow = c(1, 2))
+  #plot(sps_preds_rstr, zlim = c(0, 1))
+  #plot(occs_i_shp, add = TRUE, col = "black")
+  #plot(sps_preds_rstr, zlim = c(0, 1))
+  #dev.off()
+  
+  
+  #BI_mxnt <- ecospat::ecospat.boyce(fit = sps_preds_rstr,
+  #                                  obs = linaria_pres_test_coords, 
+  #                                  nclass = 0, 
+  #                                  window.w = "default", 
+  #                                  res = 100, 
+  #                                  PEplot = TRUE)
+  
+  ## Creating presence/absence map
+  # Threshold: minimum presence
+  
+  #info_models_maxent
+  #threshold1 <- min(extract(sps_preds_rstr, occs_i_shp))
+  #threshold1 <- quantile(extract(sps_preds_rstr, occs_i_shp), 0.1)#, na.rm = TRUE) # sensitivity = 0.9
+  #threshold1
+  
+  thresholds <- dismo::threshold(dismo::evaluate(extract(sps_preds_rstr, occs_i_shp), 
+                                                 extract(sps_preds_rstr, bckgr))) # sensitibity default 0.9
+  
+  thresholds <- dismo::threshold(dismo::evaluate(extract(sps_preds_rstr, occs_i_shp), 
+                                                 extract(sps_preds_rstr, bckgr)),
+                                 stat = "", sensitivity = 0.99) 
+  thresholds
+  #threshold2 <- as.numeric(thresholds$sensitivity)
+  #threshold2 <- as.numeric(thresholds$no_omission) # keeping all presences
+  threshold2 <- as.numeric(thresholds[names(thresholds) %in% threshold2use])
+  threshold_used <- threshold2 <- 0.09993547
+  #threshold2use <- "no_omission"
+  #threshold2use <- "sensitivity"
+  
+  a <- c(0, threshold2, 0)
+  b <- c(threshold2, 1, 1)
+  thr <- rbind(a, b)
+  
+  sps_preds_rstr_pres_abs <- reclassify(sps_preds_rstr[["predictions_maxent"]], rcl = thr, filename = '', include.lowest = FALSE, right = TRUE)
+  sps_preds_rstr_pres_abs_all <- brick(sps_preds_rstr_pres_abs)
+  names(sps_preds_rstr_pres_abs_all) <- c("Pres_Abs_MaxEnt")
+  
+  #plot(sps_preds_rstr_pres_abs)
+  
+  pdf(paste0(dir2save_maxent, "sps_predictions_maxent_", t, ".pdf"), width = 18, height = 15)
+  par(mar = c(6, 8, 6, 8), oma = c(4,0,8,0))
+  par(mfrow = c(2, 2))
+  plot(sps_preds_rstr[["predictions_maxent"]], zlim = c(0, 1), main = "Occurrences (1km)", cex.main = 2, cex.sub = 1.5, legend = FALSE)
+  plot(occs_i_shp, add = TRUE, col = "black")
+  plot(sps_preds_rstr[["predictions_maxent"]], zlim = c(0, 1), main = "MaxEnt predictions (cloglog)", cex.main = 2, cex.sub = 1.5)
+  plot(sps_preds_rstr_pres_abs, main = "Presence-Absence", 
+       sub = paste0("Threshold: '", threshold2use, " (0.99)'"), 
+       cex.main = 2, cex.sub = 1.5, legend = FALSE)
+  title(list(paste0(sps),
+             cex = 4), 
+        line = 1, outer = TRUE)
+  
+  dev.off()
+  
+  
+  running_time <- as.vector(Sys.time() - t0)
+  if(exists("data2save")) rm(data2save)
+  data2save <- data.frame(species = t, occurrences_raw, occurrences_1km, occurrences_train,
+                          occurrences_test, background_points, optimal,
+                          thresholds, threshold_used)
+  rownames(data2save) <- t
+  
+  info_models_maxent <- rbind(info_models_maxent, data2save)
+  #write.csv(info_models_maxent, "info_models_all_species.csv", row.names = FALSE)
+  #write.csv(info_models_maxent, "info_models_all_species_085.csv", row.names = FALSE)
+  write.csv(info_models_maxent, "info_models_maxent_all.csv", row.names = FALSE)
+  write.csv(info_models_maxent, paste0(dir2save_maxent, "info_models_maxent_all.csv"), row.names = FALSE)
+  #info_models_maxent <- fread("info_models_maxent_all.csv")
+  #info_models_maxent <- info_models_maxent[-3, ]
+  
+  print(paste0(t, " run in: ", running_time))
+  
+  
+}  
+
+
+
 
