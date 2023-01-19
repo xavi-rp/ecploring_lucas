@@ -678,6 +678,37 @@ occs_lucas_50_dt[occs_lucas_50_dt$POINT_ID == 41002774, ]
 
 
 
+## GBIF Occurrences from all species from the releve ####
+
+species_list_releve #<- fread("species_list_releve.csv", sep = ",")
+
+occs_all <- fread(paste0(getwd(), "/../exploring_lucas_data/D5_FFGRCC_gbif_occ/sp_records_20210709.csv"), header = TRUE)
+names(occs_all)
+
+
+sum(unique(occs_all$species) %in% species_list_releve$species_list_releve)  # 1936 (out of 2672)
+sum(!species_list_releve$species_list_releve %in% unique(occs_all$species)) # 736 not in GBIF (out of 2672)
+sum(!unique(occs_all$species) %in% species_list_releve$species_list_releve) # 12092 (out of 14028)
+
+sps_NotPrenent_GBIF <- species_list_releve$species_list_releve[!species_list_releve$species_list_releve %in% unique(occs_all$species)]
+# From the 736 species not present in the GBIF data set, several are taxa at genus or subspecies level.
+# Those at species level, they are probably synonyms (e.g. Agrostis tenuis = Agrostis capillaris)
+# As we have a good amount of species, at least for now we will be focused on the 1936 species with no issues 
+sps_NotPrenent_GBIF[11:20]
+unique(occs_all[grepl("Agrostis", occs_all$species), species])
+
+
+
+occs_all_releve <- occs_all[species %in% species_list_releve$species_list_releve, ]
+occs_all_releve
+
+length(unique(occs_all_releve$species))  # 1936 species
+nrow(occs_all_releve)  # 15410591 occurrences
+
+
+
+
+
 
 ## SDMs for all species ####
 
@@ -1443,6 +1474,7 @@ clc_vars
 
 clc_vars_all <- stack(clc_vars)
 clc_vars_all
+names(clc_vars_all)
 
 
 ## Reprojecting Worldclim to LAEA
@@ -1489,14 +1521,86 @@ all_vars
 all_vars <- crop(all_vars, extent(2500000, 6000000, 1400000, 5500000))
 plot(all_vars[[4]])
 
+names(all_vars)
+if("layer.1" %in% names(all_vars))  names(all_vars)[names(all_vars) == "layer.1"] <- "clc_1km_CoastalWet" 
+if("layer.2" %in% names(all_vars))  names(all_vars)[names(all_vars) == "layer.2"] <- "clc_1km_InlandWaters" 
+if("layer.3" %in% names(all_vars))  names(all_vars)[names(all_vars) == "layer.3"] <- "clc_1km_InlandWet" 
+if("layer.4" %in% names(all_vars))  names(all_vars)[names(all_vars) == "layer.4"] <- "clc_1km_OpenNoVeg" 
+names(all_vars)
+
+plot(all_vars[[c(1, 28)]])
+
+
+all_vars <- mask(all_vars, all_vars[[28]])
+plot(all_vars[[c(1, 28)]])
+
+all_vars <- mask(all_vars, all_vars[[1]])
+plot(all_vars[[c(1, 28)]])
+
+all_vars
+
+writeRaster(all_vars, "all_vars_clean.grd", format = "raster", overwrite = TRUE)
+
+all_vars <- brick("all_vars_clean.grd")
+
+
+## Removing multicolinarity
+
+library(virtualspecies)
+
+all_vars_NoC <- removeCollinearity(all_vars,
+                                   multicollinearity.cutoff = 0.70,
+                                   #multicollinearity.cutoff = 0.85,
+                                   select.variables = TRUE,  # if TRUE, randomly select one variable of the group. If FALSE, returns a list with the groups
+                                   sample.points = TRUE,
+                                   nb.points = 10^6,
+                                   plot = TRUE)
+all_vars_NoC
+
+dev.copy(png,'all_vars_NoC.png')
+dev.off()
+
+
+all_vars_NoC_rstr <- all_vars[[all_vars_NoC]]
+
+writeRaster(all_vars_NoC_rstr, "all_vars_NoC_rstr.grd", format = "raster", overwrite = TRUE)
+
+
+all_vars_NoC_rstr <- brick("all_vars_NoC_rstr.grd")
+names(all_vars_NoC_rstr)
 
 
 
 ### Modelling with MaxEnt ####
 
 
-all_vars
+## Predictors
+all_vars <- all_vars_NoC_rstr; rm(all_vars_NoC_rstr)
+names(all_vars)
 
+
+## Some tests run with only cliamtic/elevation variables (avoiding LU) show worse results. 
+## Therefore, LU variables contribute with some valuable information to the models.
+# ## Keeping only clim/elev variables
+# nms2keep <- names(all_vars)[grepl("bio_", names(all_vars)) | grepl("elev", names(all_vars))]
+# all_vars <- all_vars[[nms2keep]]
+  
+  
+  
+
+all_vars_data <- as.data.frame(all_vars)
+names(all_vars_data)
+apply(all_vars_data, 2, function(x) sum(is.na(x)))
+
+all_vars_data <- all_vars_data[complete.cases(all_vars_data), ]
+all_vars_data
+nrow(all_vars_data)
+
+#plot(all_vars[[c(1, 10)]])
+
+
+
+## Releve occurrences for (modelling and) validating models
 releve_point_sp_4modelling_sf <- st_as_sf(releve_point_sp_4modelling, coords = c("SURVEY_GRASS_GPS_LON", "SURVEY_GRASS_GPS_LAT"), crs = 4326)
 releve_point_sp_4modelling_laea <- st_transform(releve_point_sp_4modelling_sf, crs = st_crs(all_vars))
 releve_point_sp_4modelling_laea_coords <- data.table(st_coordinates(releve_point_sp_4modelling_laea))
@@ -1507,316 +1611,541 @@ releve_point_sp_4modelling_laea
 
 releve_point_sp_4modelling_pres_laea <- releve_point_sp_4modelling_laea[presence == 1, ]
 
-length(unique(releve_point_sp_4modelling_pres_laea$POINT_ID))  # 578
-length(unique(releve_point_sp_4modelling_pres_laea$species))  # 68
+length(unique(releve_point_sp_4modelling_pres_laea$POINT_ID))  # 578 releve points
+length(unique(releve_point_sp_4modelling_pres_laea$species))  # 68 sp
 sort(table(releve_point_sp_4modelling_pres_laea$species))
 
 
 
 
+
+## GBIF occurrences for modelling
+
+releve_point_sp_4modelling_laea
+sort(unique(releve_point_sp_4modelling_laea$species))
+
+
+sp_releve_sp4model <- gsub("\\.", " ", sort(unique(releve_point_sp_4modelling_laea$species)))
+
+sum(unique(occs_all_releve$species) %in% sp_releve_sp4model)
+
+sp_releve_sp4model[!sp_releve_sp4model %in% unique(occs_all_releve$species)]  # 5 sps from the subset of the releve that have no occurrences in GBIF 
+
+
+sp_releve_sp4model <- sp_releve_sp4model[sp_releve_sp4model %in% unique(occs_all_releve$species)]  # 63 sps ready to be modelled
+sp_releve_sp4model
+
+
+occs_all_releve_1 <- occs_all_releve[species %in% sp_releve_sp4model]
+occs_all_releve_1
+
+sort(unique(occs_all_releve_1$species))
+sort(table(occs_all_releve_1$species))    # Sanguisorba minor has only one occurrence in GBIF. Removed
+range(table(occs_all_releve_1$species))
+
+occs_all_releve_1 <- occs_all_releve_1[species != "Sanguisorba minor", ]
+range(table(occs_all_releve_1$species))   # 1716 - 293287 occurrences
+
+
+occs_all_releve_1_sf <- st_as_sf(occs_all_releve_1, coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
+occs_all_releve_1_laea <- st_transform(occs_all_releve_1_sf, crs = st_crs(all_vars))
+occs_all_releve_1_laea_coords <- data.table(st_coordinates(occs_all_releve_1_laea))
+occs_all_releve_1_laea <- cbind(data.table(occs_all_releve_1_laea), occs_all_releve_1_laea_coords)
+occs_all_releve_1_laea
+
+
+## Background points
+
+bckgr <- dismo::randomPoints(all_vars[[1]], 
+                             #n = 10000)
+                             #n = 15000)
+                             n = 100000)
+bckgr <- as.data.frame(bckgr)
+head(bckgr)
+nrow(bckgr)
+
+write.csv(bckgr, "background_points.csv", row.names = FALSE)
+bckgr <- read.csv("background_points.csv", header = TRUE)
+head(bckgr)
+
+
+
 info_models_maxent <- c()
+data2save_ReleveValid <- c()
 
 # Threshold to use for converting to presence/absence
 # Options: kappa,  spec_sens, no_omission, prevalence, equal_sens_spec, sensitivity
 #threshold2use <- "sensitivity"    # deffault 0.9
-threshold2use <- "no_omission"    # keeping all presences
+#threshold2use <- "sensitivity.99"    # sensitivity 0.99
+#threshold2use <- "no_omission"    # keeping all presences
+#threshold2use <- "prevalence"    # modeled prevalence is closest to observed prevalenc
+#threshold2use <- "equal_sens_spec"    # equal sensitivity and specificity
+#threshold2use <- "kappa"    #  the threshold at which kappa is highest ("max kappa")
+threshold2use <- "spec_sens"    # sum of the sensitivity (true positive rate) and specificity (true negative rate) is highest
 
 Sys.time()
 
-taxons <- unique(releve_point_sp_4modelling_pres$species)
+#taxons <- unique(releve_point_sp_4modelling_pres_laea$species)
+sort(table((occs_all_releve_1_laea$species)))
+taxons <- unique(occs_all_releve_1_laea$species)
+taxons <- c("Poa bulbosa", "Leontodon hispidus", "Cerastium fontanum", "Rumex obtusifolius", "Trifolium repens", "Festuca rubra")
+occs_all <- occs_all_releve_1_laea
 
-for (t in taxons){
-  #print(t)
-  #t <- taxons[1]
-  t0 <- Sys.time()
-  print(t0)
-  #sps <- spcies[spcies$taxons == t, "sps"]
-  sps <- t
+
+
+for(bk in c(500, 1000, 5000, 7500, 10000, 15000, 25000, 50000, 60000, 75000, 100000)){
+  #bk <- 500
+  print(paste0("running backgound points... ", bk))
   
-  print(paste0("running... ", sps))
+  bckgr <- dismo::randomPoints(all_vars[[1]], 
+                               #n = 10000)
+                               #n = 15000)
+                               #n = 100000)
+                               n = bk)
+  bckgr <- as.data.frame(bckgr)
+  head(bckgr)
+  nrow(bckgr)
   
-  dir2save_maxent <- paste0("models_maxent_", t, "/")
-  if(!dir.exists(paste0("models_maxent_", t))) {
-    dir.create(dir2save_maxent)
-  }
-  
-  dir2save_presences <- paste0("pres4modelling", "/")
-  if(!dir.exists(paste0("pres4modelling"))) {
-    dir.create(dir2save_presences)
-  }
-  
-  occs_i <- occs_all[occs_all$sp2 %in% t, c("decimalLongitude", "decimalLatitude")]
-  occurrences_raw <- nrow(occs_i)
-  
-  occs_i_shp <- SpatialPointsDataFrame(coords = occs_i[, c("decimalLongitude", "decimalLatitude")],
-                                       data = data.frame(sp = rep(1, nrow(occs_i))),
-                                       proj4string = CRS("+init=EPSG:4326"))
-  #names(occs_i_shp) <- t
-  occs_i_rstr <- rasterize(occs_i_shp, worldclim_all[[1]], field = "sp", background = 0)
-  #names(occs_i_rstr) <- t
-  #occs_i_rstr <- occs_i_rstr[[2]]
-  occs_i_rstr <- mask(occs_i_rstr, worldclim_all[[1]])
-  
-  #assign(paste0(t, "_rstr"), occs_i_rstr)
-  #print(sum(getValues(occs_i_rstr) == 1, na.rm = T))
+  write.csv(bckgr, paste0("background_points_", bk, ".csv"), row.names = FALSE)
+  bckgr <- read.csv(paste0("background_points_", bk, ".csv"), header = TRUE)
+  head(bckgr)
+
+    
+  ####
   
   
-  ## occurrences for training/testing
-  sps_data <- stack(occs_i_rstr, worldclim_all) 
-  sps_data <- as.data.table(as.data.frame(sps_data))
-  sps_data[, raster_position := 1:nrow(sps_data)]
   
-  # data set for presences
-  sps_data_presences <- sps_data[layer == 1, ]
-  sps_data_presences <- sps_data_presences[complete.cases(sps_data_presences), ]
-  occurrences_1km <- nrow(sps_data_presences)
-  rm(sps_data); gc()
-  
-  # data set for pseudo-absences
-  sps_data_absences <- as.data.table(as.data.frame(raster::extract(worldclim_all, bckgr, cellnumbers = TRUE)))
-  sps_data_absences <- sps_data_absences[!sps_data_absences$cells %in% sps_data_presences$raster_position, ]
-  names(sps_data_absences)
-  
-  nrow(sps_data_presences)
-  nrow(sps_data_absences)
-  
-  prop4test <- 0.3
-  prop4train <- 1 - prop4test
-  
-  sps_data_presences_train <- sample_n(sps_data_presences, ceiling(nrow(sps_data_presences) * prop4train))
-  sps_data_presences_test <- sps_data_presences[!sps_data_presences$raster_position %in% sps_data_presences_train$raster_position, ]
-  
-  write.csv(sps_data_presences_train, paste0(dir2save_presences, "/sps_data_presences_train_", t, ".csv"), row.names = FALSE)
-  write.csv(sps_data_presences_test, paste0(dir2save_presences, "/sps_data_presences_test_", t, ".csv"), row.names = FALSE)
-  write.csv(sps_data_absences, paste0(dir2save_presences, "/sps_data_absences_", t, ".csv"), row.names = FALSE)
-  
-  #sps_data_presences_train <- fread(paste0(dir2save_presences, "/sps_data_presences_train_", t, ".csv"), header = TRUE)
-  #sps_data_presences_test <- fread(paste0(dir2save_presences, "/sps_data_presences_test_", t, ".csv"), header = TRUE)
-  #sps_data_absences <- fread(paste0(dir2save_presences, "/sps_data_absences_", t, ".csv"), header = TRUE)  
-  
-  
-  ## Running ENMeval (https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0.0-vignette.html)
-  ## Including a tryCatch to avoid stop process if there's an error because of a bug with "H" transformation or something
-  
-  library(dismo)
-  library(ENMeval)
-  
-  dir_func <- function(sps_data_presences, worldclim_all, sps_data_absences, fc){ # to avoid stop modelling if low number of background points or other errors
-    res <- tryCatch(
-      {
-        library(dismo)
-        library(ENMeval)
-        #modl1 <- ENMevaluate(occs = sps_data_presences[1:3000, .SD, .SDcols = names(worldclim_all)], 
-        modl1 <- ENMevaluate(occs = sps_data_presences_train[, .SD, .SDcols = names(worldclim_all)], 
-                             envs = NULL, 
-                             bg = sps_data_absences[, .SD, .SDcols = names(worldclim_all)], 
-                             algorithm = 'maxnet', 
-                             #partitions = 'block', 
-                             partitions = "testing",
-                             #occs.testing = sps_data_presences[3001:3750, .SD, .SDcols = names(worldclim_all)],  # occurrences for testing; only when partitions = 'testing'
-                             occs.testing = sps_data_presences_test[, .SD, .SDcols = names(worldclim_all)],  # occurrences for testing; only when partitions = 'testing'
-                             tune.args = list(
-                               #fc = c("L","LQ","LQH","H"),
-                               #fc = c("L","LQ","LQH"),  # removed "H" because there is some bug in maxnet that gives error for some species
-                               #fc = c("L","LQ"),  # removed "H" and "LQH" because there is some bug in maxnet that gives error for some species
-                               #fc = c("L","LQ"),
-                               fc = fc,
-                               rm = c(1, 2, 5)
-                               #rm = 1:2
-                             ),
-                             quiet = TRUE,
-                             parallel = TRUE,
-                             #parallel = FALSE,
-                             numCores = 12
-                             #numCores = 4
-        )
-        
-      },
-      error = function(con){
-        message(con)
-        return(NULL)
-      }
+  for (t in taxons){
+    #print(t)
+    #t <- taxons[1]
+    t0 <- Sys.time()
+    print(t0)
+    #sps <- spcies[spcies$taxons == t, "sps"]
+    sps <- t
+    
+    print(paste0("running... ", sps))
+    
+    dir2save_maxent <- paste0("models_maxent_", t, "/")
+    if(!dir.exists(paste0("models_maxent_", t))) {
+      dir.create(dir2save_maxent)
+    }
+    
+    dir2save_presences <- paste0("pres4modelling", "/")
+    if(!dir.exists(paste0("pres4modelling"))) {
+      dir.create(dir2save_presences)
+    }
+    
+    occs_i <- occs_all[occs_all$species %in% t, c("X", "Y")]
+    occurrences_raw <- nrow(occs_i)
+    
+    occs_i_shp <- SpatialPointsDataFrame(coords = occs_i[, c("X", "Y")],
+                                         data = data.frame(sp = rep(1, nrow(occs_i))),
+                                         proj4string = CRS("+init=EPSG:3035"))
+    #names(occs_i_shp) <- t
+    occs_i_rstr <- rasterize(occs_i_shp, all_vars[[1]], field = "sp", background = 0)
+    #names(occs_i_rstr) <- t
+    #occs_i_rstr <- occs_i_rstr[[2]]
+    occs_i_rstr <- mask(occs_i_rstr, all_vars[[1]])
+    #plot(occs_i_rstr)
+    
+    #assign(paste0(t, "_rstr"), occs_i_rstr)
+    #print(sum(getValues(occs_i_rstr) == 1, na.rm = T))
+    
+    
+    ## occurrences for training/testing
+    sps_data <- stack(occs_i_rstr, all_vars) 
+    sps_data <- as.data.table(as.data.frame(sps_data))
+    sps_data[, raster_position := 1:nrow(sps_data)]
+    
+    # data set for presences
+    sps_data_presences <- sps_data[layer == 1, ]
+    sps_data_presences <- sps_data_presences[complete.cases(sps_data_presences), ]
+    occurrences_1km <- nrow(sps_data_presences)
+    rm(sps_data); gc()
+    
+    # data set for pseudo-absences
+    sps_data_absences <- as.data.table(as.data.frame(raster::extract(all_vars, bckgr, cellnumbers = TRUE)))
+    sps_data_absences <- sps_data_absences[!sps_data_absences$cells %in% sps_data_presences$raster_position, ]
+    names(sps_data_absences)
+    
+    nrow(sps_data_presences)
+    nrow(sps_data_absences)
+    
+    prop4test <- 0.3
+    prop4train <- 1 - prop4test
+    
+    sps_data_presences_train <- sample_n(sps_data_presences, ceiling(nrow(sps_data_presences) * prop4train))
+    sps_data_presences_test <- sps_data_presences[!sps_data_presences$raster_position %in% sps_data_presences_train$raster_position, ]
+    
+    write.csv(sps_data_presences_train, paste0(dir2save_presences, "/sps_data_presences_train_", t, ".csv"), row.names = FALSE)
+    write.csv(sps_data_presences_test, paste0(dir2save_presences, "/sps_data_presences_test_", t, ".csv"), row.names = FALSE)
+    write.csv(sps_data_absences, paste0(dir2save_presences, "/sps_data_absences_", t, ".csv"), row.names = FALSE)
+    
+    #sps_data_presences_train <- fread(paste0(dir2save_presences, "/sps_data_presences_train_", t, ".csv"), header = TRUE)
+    #sps_data_presences_test <- fread(paste0(dir2save_presences, "/sps_data_presences_test_", t, ".csv"), header = TRUE)
+    #sps_data_absences <- fread(paste0(dir2save_presences, "/sps_data_absences_", t, ".csv"), header = TRUE)  
+    
+    
+    ## Running ENMeval (https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0.0-vignette.html)
+    ## Including a tryCatch to avoid stop process if there's an error because of a bug with "H" transformation or something
+    
+    library(dismo)
+    library(ENMeval)
+    
+    dir_func <- function(sps_data_presences, all_vars, sps_data_absences, fc){ # to avoid stop modelling if low number of background points or other errors
+      res <- tryCatch(
+        {
+          library(dismo)
+          library(ENMeval)
+          #modl1 <- ENMevaluate(occs = sps_data_presences[1:3000, .SD, .SDcols = names(all_vars)], 
+          modl1 <- ENMevaluate(occs = sps_data_presences_train[, .SD, .SDcols = names(all_vars)], 
+                               envs = NULL, 
+                               bg = sps_data_absences[, .SD, .SDcols = names(all_vars)], 
+                               algorithm = 'maxnet', 
+                               #partitions = 'block', 
+                               partitions = "testing",
+                               #occs.testing = sps_data_presences[3001:3750, .SD, .SDcols = names(all_vars)],  # occurrences for testing; only when partitions = 'testing'
+                               occs.testing = sps_data_presences_test[, .SD, .SDcols = names(all_vars)],  # occurrences for testing; only when partitions = 'testing'
+                               tune.args = list(
+                                 fc = fc,
+                                 rm = c(1, 2, 5)
+                                 #rm = 1:2
+                               ),
+                               quiet = TRUE,
+                               parallel = TRUE,
+                               #parallel = FALSE,
+                               numCores = 12
+                               #numCores = 4
+          )
+          
+        },
+        error = function(con){
+          message(con)
+          return(NULL)
+        }
+      )
+      if(exists("modl1")){ return(modl1) }else{ return(NULL) }
+    } #end of dir_func
+    
+    
+    fc_opts <- list(c("L","LQ","LQH","H"), c("L","LQ","LQH"), c("L","LQ"), "L")
+    
+    for(fc in fc_opts){
+      modl <- dir_func(sps_data_presences, all_vars, sps_data_absences, fc)
+      if(!is.null(modl)) break
+    }
+    
+    
+    #rm(sps_data_absences); gc()
+    modl
+    modl@results
+    #View(modl@results)
+    write.csv(modl@results, file = paste0(dir2save_maxent, "ENMeval_results_", t, ".csv"))
+    save(modl, file = paste0(dir2save_maxent, "models_", t, ".RData"))
+    #evalplot.stats(e = modl, stats = "or.mtp", color = "fc", x.var = "rm")
+    #load(paste0(dir2save_maxent, "models_", t, ".RData"), verbose = TRUE)
+    
+    occurrences_train <- nrow(modl@occs)
+    occurrences_test <- nrow(modl@occs.testing)  # none because cross-validation
+    background_points <- nrow(modl@bg)
+    
+    
+    # selecting optimal model
+    results <- eval.results(modl)
+    results
+    #View(results)
+    optimal <- results %>% filter(delta.AICc == 0)
+    optimal
+    if(nrow(optimal) > 1) optimal <- optimal[1, ]
+    
+    modl_args <- eval.models(modl)[[optimal$tune.args]]
+    modl_args$betas
+    #str(modl_args)
+    
+    #dev.off()
+    pdf(paste0(dir2save_maxent, "opt_model_RespCurves_", t, ".pdf"))
+    plot(modl_args, type = "cloglog")
+    # And these are the marginal response curves for the predictor variables wit non-zero 
+    # coefficients in our model. We define the y-axis to be the cloglog transformation, which
+    # is an approximation of occurrence probability (with assumptions) bounded by 0 and 1
+    # (Phillips et al. 2017).
+    dev.off()
+    
+    modl <- modl@models[[optimal$tune.args]]
+    gc()
+    
+    #save(modl, file = paste0(dir2save_maxent, "opt_model_", t, ".RData"))
+    
+    # making predictions
+    #worldclim_all_data <- fread("worldclim_all_data_NoCor.csv", header = TRUE)
+    #worldclim_all_data <- fread("worldclim_all_data_NoCor_070.csv", header = TRUE)
+    #worldclim_all_data <- fread("worldclim_all_data_NoCor_040.csv", header = TRUE)
+    #worldclim_all_data <- fread(paste0(preds_dir, "worldclim_all_data.csv"), header = TRUE)
+    #names(worldclim_all_data) <- names(worldclim_all)
+    #names(worldclim_all_data) <- gsub("wc2.1_30s_bio_", "worldclim_all.", names(worldclim_all_data))
+    #names(worldclim_all_data) <- gsub("wc2.1_30s_elev", "worldclim_all.20", names(worldclim_all_data))
+    #names(worldclim_all_data) <- gsub("worldclim_all", "worldclim_all", names(worldclim_all_data))
+    #worldclim_all_data <- worldclim_all_data[complete.cases(worldclim_all_data), ]
+    
+    
+    sps_predictions_maxent <- predict(object = modl, 
+                                      newdata = all_vars_data, 
+                                      clamp = TRUE,
+                                      type = c("cloglog")
     )
-    if(exists("modl1")){ return(modl1) }else{ return(NULL) }
-  } #end of dir_func
+    #rm(worldclim_all_data); gc()
+    sps_predictions_maxent <- as.data.table(sps_predictions_maxent)
+    head(sps_predictions_maxent)
+    range(sps_predictions_maxent)
+    nrow(sps_predictions_maxent)
+    
+    
+    all_vars_data0 <- as.data.table(as.data.frame(all_vars[[1]]))
+    all_vars_data0$raster_position <- 1:nrow(all_vars_data0)
+    
+    all_vars_data1 <- all_vars_data0
+    all_vars_data1 <- all_vars_data1[complete.cases(all_vars_data1), ]
+    
+    all_vars_data0 <- all_vars_data0[, .SD, .SDcols = "raster_position"]
+    
+    all_vars_data1[, predictions := sps_predictions_maxent$V1]
+    
+    
+    all_vars_data0 <- merge(all_vars_data0[, "raster_position", with = FALSE], 
+                            all_vars_data1[, .SD, .SDcols = c("raster_position", "predictions")], 
+                            by = "raster_position", all.x = TRUE)
+    
+    #rm(worldclim_all_data1); gc()
+    
+    sps_preds_rstr <- all_vars[[1]]
+    sps_preds_rstr <- setValues(sps_preds_rstr, all_vars_data0$predictions)
+    names(sps_preds_rstr) <- "predictions_maxent"
+    
+    #rm(worldclim_all_data0); gc()
+    
+    
+    #pdf("sps_predictions_maxent_kk.pdf", width = 20, height = 15)
+    #par(mfrow = c(1, 2))
+    #plot(sps_preds_rstr, zlim = c(0, 1))
+    #plot(occs_i_shp, add = TRUE, col = "black")
+    #plot(sps_preds_rstr, zlim = c(0, 1))
+    #dev.off()
+    
+    
+    #BI_mxnt <- ecospat::ecospat.boyce(fit = sps_preds_rstr,
+    #                                  obs = linaria_pres_test_coords, 
+    #                                  nclass = 0, 
+    #                                  window.w = "default", 
+    #                                  res = 100, 
+    #                                  PEplot = TRUE)
+    
+    ## Creating presence/absence map
+    # Threshold: minimum presence
+    
+    #info_models_maxent
+    #threshold1 <- min(extract(sps_preds_rstr, occs_i_shp))
+    #threshold1 <- quantile(extract(sps_preds_rstr, occs_i_shp), 0.1)#, na.rm = TRUE) # sensitivity = 0.9
+    #threshold1
+    
+    thresholds <- dismo::threshold(dismo::evaluate(raster::extract(sps_preds_rstr, occs_i_shp), 
+                                                   raster::extract(sps_preds_rstr, bckgr))) # sensitibity default 0.9
+    
+    thresholds$sensitivity.99 <- dismo::threshold(dismo::evaluate(raster::extract(sps_preds_rstr, occs_i_shp), 
+                                                                  raster::extract(sps_preds_rstr, bckgr)),
+                                                  stat = "sensitivity", sensitivity = 0.99) 
+    thresholds
+    
+    #threshold2 <- as.numeric(thresholds$sensitivity)
+    #threshold2 <- as.numeric(thresholds$no_omission) # keeping all presences
+    threshold2 <- as.numeric(thresholds[names(thresholds) %in% threshold2use])
+    threshold_used <- threshold2 #<- 0.09993547
+    #threshold2use <- "no_omission"
+    #threshold2use <- "sensitivity"
+    
+    a <- c(0, threshold2, 0)
+    b <- c(threshold2, 1, 1)
+    thr <- rbind(a, b)
+    
+    sps_preds_rstr_pres_abs <- reclassify(sps_preds_rstr[["predictions_maxent"]], rcl = thr, filename = '', include.lowest = FALSE, right = TRUE)
+    sps_preds_rstr_pres_abs_all <- brick(sps_preds_rstr_pres_abs)
+    names(sps_preds_rstr_pres_abs_all) <- c("Pres_Abs_MaxEnt")
+    
+    #plot(sps_preds_rstr_pres_abs)
+    
+    #pdf(paste0(dir2save_maxent, "sps_predictions_maxent_", t, ".pdf"), width = 18, height = 15)
+    png(paste0(dir2save_maxent, "sps_predictions_maxent_", t, ".png"), width = 20, height = 25, units = "cm", res = 75)
+    #par(mar = c(6, 8, 6, 8), oma = c(4,0,8,0))
+    par(mar = c(5, 2, 5, 2), oma = c(4,0,8,0))
+    par(mfrow = c(2, 2))
+    #plot(sps_preds_rstr[["predictions_maxent"]], zlim = c(0, 1), main = "Occurrences (1km)", cex.main = 2, cex.sub = 1.5, legend = FALSE)
+    #plot(occs_i_shp, add = TRUE, col = "black")
+    plot(occs_i_rstr, col = c("LightGrey", "LightGrey"), main = "Occurrences (1km)", cex.main = 1.2, legend = FALSE)
+    occs_i_rstr_centr <- rasterToPoints(occs_i_rstr, fun = function(x){x == 1}, spatial = TRUE)
+    plot(occs_i_rstr_centr, add = TRUE, col = "darkred", pch = 3, cex = 0.01)
+    plot(sps_preds_rstr[["predictions_maxent"]], zlim = c(0, 1), main = "MaxEnt predictions (cloglog)", cex.main = 1.2, cex.sub = 1.5)
+    plot(sps_preds_rstr_pres_abs, main = "Presence-Absence", 
+         #sub = paste0("Threshold: '", threshold2use, " (0.99)'"), 
+         sub = paste0("Threshold: '", threshold2use, "'"), 
+         cex.main = 1.2, cex.sub = 0.9, legend = FALSE)
+    title(list(paste0(sps),
+               #cex = 4), 
+               cex = 2), 
+          line = 1, outer = TRUE)
+    
+    dev.off()
+    
+    
+    
+    
+    
+    #### Validating with releve data
+    library(PresenceAbsence)
+    
+    releve_point_sp_4modelling_laea
+    
+    releve_point_sp_4modelling_laea_i <- releve_point_sp_4modelling_laea[species %in% gsub(" ", ".", t), ] 
+    table(releve_point_sp_4modelling_laea_i$presence)
+    releve_point_sp_4modelling_laea_i
+    
+    
+    releve_point_sp_4modelling_laea_i$maxent_preds <- raster::extract(sps_preds_rstr[["predictions_maxent"]], 
+                                                                      releve_point_sp_4modelling_laea_i[, .SD, .SDcols = c("X", "Y")]
+    )
+    
+    releve_point_sp_4modelling_laea_i
+    sum(is.na(releve_point_sp_4modelling_laea_i$maxent_preds))  # 20 points with no prediction
+    
+    
+    #obs_pred_conf <- cmx(releve_point_sp_4modelling_laea_i[, .SD, .SDcols = c("POINT_ID", "presence", "maxent_preds")], 
+    #                     threshold = threshold_used,
+    #                     na.rm = TRUE)
+    #obs_pred_conf
+    
+    data2save_ReleveValid_i <- c()
+    
+    for(tr in (1:length(thresholds))){
+      #print(names(thresholds)[t])
+      
+      obs_pred_conf_i <- cmx(releve_point_sp_4modelling_laea_i[, .SD, .SDcols = c("POINT_ID", "presence", "maxent_preds")], 
+                             threshold = as.numeric(thresholds[tr]),
+                             na.rm = TRUE)
+      #print(obs_pred_conf_i)
+      
+      ## Proportion of correctly classified observations
+      #print(paste0("Prop Correctly Classified = ", round(pcc(obs_pred_conf_i, st.dev = F), 2)))
+      ProportionCorrectlyClassified <- round(pcc(obs_pred_conf_i, st.dev = F), 2)
+      #
+      ## Sensitivity = true positive rate
+      #print(paste0("True Positive Rate = ", sensitivity(obs_pred_conf_i, st.dev = F)))
+      TruePositiveRate <- round(sensitivity(obs_pred_conf_i, st.dev = F))
+      #
+      ## Specificity = true negative rate
+      #print(paste0("True Negative Rate = ", round(specificity(obs_pred_conf_i, st.dev = F), 2)))
+      TrueNegativeRate <- round(specificity(obs_pred_conf_i, st.dev = F), 2)
+      #
+      ## Kappa. According to Araujo et al. (2005), Kappa > 0.4 indicate good predictions. 
+      #print(paste0("Kappa = ", round(Kappa(obs_pred_conf_i, st.dev = F), 2)))
+      Kappa <- round(Kappa(obs_pred_conf_i, st.dev = F), 2)
+      #
+      ## True skill statistic (sensit+specit-1)
+      ## For TSS, we often assume TSS > 0.5 to indicate good predictions
+      #print(paste0("TSS = ", round((sensitivity(obs_pred_conf_i, st.dev = F) + 
+      #                          specificity(obs_pred_conf_i, st.dev = F) -
+      #                          1), 2)))
+      TSS <- round((sensitivity(obs_pred_conf_i, st.dev = F) + 
+                      specificity(obs_pred_conf_i, st.dev = F) -
+                      1), 2)
+      #
+      #
+      #
+      #print(" ")
+      
+      
+      data2save_ReleveValid_i_i <- data.frame(species = t, 
+                                              threshold = names(thresholds)[tr], 
+                                              threshold_value = as.numeric(thresholds[tr]),
+                                              ProportionCorrectlyClassified,
+                                              TruePositiveRate,
+                                              TrueNegativeRate,
+                                              Kappa,
+                                              TSS)
+      
+      data2save_ReleveValid_i <- rbind(data2save_ReleveValid_i, data2save_ReleveValid_i_i)
+    }
+    
+    data2save_ReleveValid <- rbind(data2save_ReleveValid, data2save_ReleveValid_i)
+    data2save_ReleveValid
+    
+    
+    ## Threshold independent (https://damariszurell.github.io/EEC-MGC/b4_SDM_eval.html#22_Assessing_SDM_performance)
+    library(AUC)
+    
+    preds_clean <- na.omit(releve_point_sp_4modelling_laea_i)
+    
+    roc <- roc(preds_clean$maxent_preds, as.factor(preds_clean$presence))
+    
+    png(paste0(dir2save_maxent, "roc_", t, "_", bk, ".png"), width = 15, height = 15, units = "cm", res = 75)
+    plot(roc, col = "grey70", lwd = 2)
+    dev.off()
+    
+    AUC_ROC <- round(AUC::auc(roc), 3)
+    
+    data2save_ReleveValid$AUC <- rep(AUC_ROC, nrow(data2save_ReleveValid))
+    
+    
+    write.csv(data2save_ReleveValid, "info_models_maxent_ReleveValid.csv", row.names = FALSE)
+    write.csv(data2save_ReleveValid, paste0(dir2save_maxent, "info_models_maxent_ReleveValid.csv"), row.names = FALSE)
+    
+    
+    ####
+    
+    
+    
+    running_time <- as.vector(Sys.time() - t0)
+    if(exists("data2save")) rm(data2save)
+    data2save <- data.frame(species = t, occurrences_raw, occurrences_1km, occurrences_train,
+                            occurrences_test, background_points, optimal,
+                            thresholds, threshold_used)
+    rownames(data2save) <- t
+    
+    info_models_maxent <- rbind(info_models_maxent, data2save)
+    #write.csv(info_models_maxent, "info_models_all_species.csv", row.names = FALSE)
+    #write.csv(info_models_maxent, "info_models_all_species_085.csv", row.names = FALSE)
+    write.csv(info_models_maxent, "info_models_maxent_all.csv", row.names = FALSE)
+    write.csv(info_models_maxent, paste0(dir2save_maxent, "info_models_maxent_all.csv"), row.names = FALSE)
+    #info_models_maxent <- fread("info_models_maxent_all.csv")
+    #info_models_maxent <- info_models_maxent[-3, ]
+    
+    print(paste0(t, " run in: ", running_time))
+    print(paste0(bk, " background points run in: ", running_time))
+    
+    
+  }  
   
-  
-  fc_opts <- list(c("L","LQ","LQH","H"), c("L","LQ","LQH"), c("L","LQ"), "L")
-  
-  for(fc in fc_opts){
-    modl <- dir_func(sps_data_presences, worldclim_all, sps_data_absences, fc)
-    if(!is.null(modl)) break
-  }
-  
-  
-  #rm(sps_data_absences); gc()
-  modl
-  modl@results
-  #View(modl@results)
-  write.csv(modl@results, file = paste0(dir2save_maxent, "ENMeval_results_", t, ".csv"))
-  save(modl, file = paste0(dir2save_maxent, "models_", t, ".RData"))
-  #evalplot.stats(e = modl, stats = "or.mtp", color = "fc", x.var = "rm")
-  #load(paste0(dir2save_maxent, "models_", t, ".RData"), verbose = TRUE)
-  
-  occurrences_train <- nrow(modl@occs)
-  occurrences_test <- nrow(modl@occs.testing)  # none because cross-validation
-  background_points <- nrow(modl@bg)
-  
-  
-  # selecting optimal model
-  results <- eval.results(modl)
-  results
-  #View(results)
-  optimal <- results %>% filter(delta.AICc == 0)
-  optimal
-  if(nrow(optimal) > 1) optimal <- optimal[1, ]
-  
-  modl_args <- eval.models(modl)[[optimal$tune.args]]
-  modl_args$betas
-  #str(modl_args)
-  
-  #dev.off()
-  pdf(paste0(dir2save_maxent, "opt_model_RespCurves_", t, ".pdf"))
-  plot(modl_args, type = "cloglog")
-  # And these are the marginal response curves for the predictor variables wit non-zero 
-  # coefficients in our model. We define the y-axis to be the cloglog transformation, which
-  # is an approximation of occurrence probability (with assumptions) bounded by 0 and 1
-  # (Phillips et al. 2017).
-  dev.off()
-  
-  modl <- modl@models[[optimal$tune.args]]
-  gc()
-  
-  #save(modl, file = paste0(dir2save_maxent, "opt_model_", t, ".RData"))
-  
-  # making predictions
-  #worldclim_all_data <- fread("worldclim_all_data_NoCor.csv", header = TRUE)
-  #worldclim_all_data <- fread("worldclim_all_data_NoCor_070.csv", header = TRUE)
-  #worldclim_all_data <- fread("worldclim_all_data_NoCor_040.csv", header = TRUE)
-  #worldclim_all_data <- fread(paste0(preds_dir, "worldclim_all_data.csv"), header = TRUE)
-  #names(worldclim_all_data) <- names(worldclim_all)
-  #names(worldclim_all_data) <- gsub("wc2.1_30s_bio_", "worldclim_all.", names(worldclim_all_data))
-  #names(worldclim_all_data) <- gsub("wc2.1_30s_elev", "worldclim_all.20", names(worldclim_all_data))
-  #names(worldclim_all_data) <- gsub("worldclim_all", "worldclim_all", names(worldclim_all_data))
-  #worldclim_all_data <- worldclim_all_data[complete.cases(worldclim_all_data), ]
-  sps_predictions_maxent <- predict(object = modl, 
-                                    newdata = worldclim_all_data, 
-                                    clamp = TRUE,
-                                    type = c("cloglog")
-  )
-  #rm(worldclim_all_data); gc()
-  sps_predictions_maxent <- as.data.table(sps_predictions_maxent)
-  head(sps_predictions_maxent)
-  range(sps_predictions_maxent)
-  nrow(sps_predictions_maxent)
-  
-  worldclim_all_data0 <- as.data.table(as.data.frame(worldclim_all[[1]]))
-  worldclim_all_data0$raster_position <- 1:nrow(worldclim_all_data0)
-  
-  worldclim_all_data1 <- worldclim_all_data0
-  worldclim_all_data1 <- worldclim_all_data1[complete.cases(worldclim_all_data1), ]
-  
-  worldclim_all_data0 <- worldclim_all_data0[, .SD, .SDcols = "raster_position"]
-  
-  worldclim_all_data1[, predictions := sps_predictions_maxent$V1]
-  
-  
-  worldclim_all_data0 <- merge(worldclim_all_data0[, "raster_position", with = FALSE], 
-                               worldclim_all_data1[, .SD, .SDcols = c("raster_position", "predictions")], 
-                               by = "raster_position", all.x = TRUE)
-  
-  #rm(worldclim_all_data1); gc()
-  
-  sps_preds_rstr <- worldclim_all[[1]]
-  sps_preds_rstr <- setValues(sps_preds_rstr, worldclim_all_data0$predictions)
-  names(sps_preds_rstr) <- "predictions_maxent"
-  
-  #rm(worldclim_all_data0); gc()
-  
-  
-  #pdf("sps_predictions_maxent_kk.pdf", width = 20, height = 15)
-  #par(mfrow = c(1, 2))
-  #plot(sps_preds_rstr, zlim = c(0, 1))
-  #plot(occs_i_shp, add = TRUE, col = "black")
-  #plot(sps_preds_rstr, zlim = c(0, 1))
-  #dev.off()
-  
-  
-  #BI_mxnt <- ecospat::ecospat.boyce(fit = sps_preds_rstr,
-  #                                  obs = linaria_pres_test_coords, 
-  #                                  nclass = 0, 
-  #                                  window.w = "default", 
-  #                                  res = 100, 
-  #                                  PEplot = TRUE)
-  
-  ## Creating presence/absence map
-  # Threshold: minimum presence
-  
-  #info_models_maxent
-  #threshold1 <- min(extract(sps_preds_rstr, occs_i_shp))
-  #threshold1 <- quantile(extract(sps_preds_rstr, occs_i_shp), 0.1)#, na.rm = TRUE) # sensitivity = 0.9
-  #threshold1
-  
-  thresholds <- dismo::threshold(dismo::evaluate(extract(sps_preds_rstr, occs_i_shp), 
-                                                 extract(sps_preds_rstr, bckgr))) # sensitibity default 0.9
-  
-  thresholds <- dismo::threshold(dismo::evaluate(extract(sps_preds_rstr, occs_i_shp), 
-                                                 extract(sps_preds_rstr, bckgr)),
-                                 stat = "", sensitivity = 0.99) 
-  thresholds
-  #threshold2 <- as.numeric(thresholds$sensitivity)
-  #threshold2 <- as.numeric(thresholds$no_omission) # keeping all presences
-  threshold2 <- as.numeric(thresholds[names(thresholds) %in% threshold2use])
-  threshold_used <- threshold2 <- 0.09993547
-  #threshold2use <- "no_omission"
-  #threshold2use <- "sensitivity"
-  
-  a <- c(0, threshold2, 0)
-  b <- c(threshold2, 1, 1)
-  thr <- rbind(a, b)
-  
-  sps_preds_rstr_pres_abs <- reclassify(sps_preds_rstr[["predictions_maxent"]], rcl = thr, filename = '', include.lowest = FALSE, right = TRUE)
-  sps_preds_rstr_pres_abs_all <- brick(sps_preds_rstr_pres_abs)
-  names(sps_preds_rstr_pres_abs_all) <- c("Pres_Abs_MaxEnt")
-  
-  #plot(sps_preds_rstr_pres_abs)
-  
-  pdf(paste0(dir2save_maxent, "sps_predictions_maxent_", t, ".pdf"), width = 18, height = 15)
-  par(mar = c(6, 8, 6, 8), oma = c(4,0,8,0))
-  par(mfrow = c(2, 2))
-  plot(sps_preds_rstr[["predictions_maxent"]], zlim = c(0, 1), main = "Occurrences (1km)", cex.main = 2, cex.sub = 1.5, legend = FALSE)
-  plot(occs_i_shp, add = TRUE, col = "black")
-  plot(sps_preds_rstr[["predictions_maxent"]], zlim = c(0, 1), main = "MaxEnt predictions (cloglog)", cex.main = 2, cex.sub = 1.5)
-  plot(sps_preds_rstr_pres_abs, main = "Presence-Absence", 
-       sub = paste0("Threshold: '", threshold2use, " (0.99)'"), 
-       cex.main = 2, cex.sub = 1.5, legend = FALSE)
-  title(list(paste0(sps),
-             cex = 4), 
-        line = 1, outer = TRUE)
-  
-  dev.off()
-  
-  
-  running_time <- as.vector(Sys.time() - t0)
-  if(exists("data2save")) rm(data2save)
-  data2save <- data.frame(species = t, occurrences_raw, occurrences_1km, occurrences_train,
-                          occurrences_test, background_points, optimal,
-                          thresholds, threshold_used)
-  rownames(data2save) <- t
-  
-  info_models_maxent <- rbind(info_models_maxent, data2save)
-  #write.csv(info_models_maxent, "info_models_all_species.csv", row.names = FALSE)
-  #write.csv(info_models_maxent, "info_models_all_species_085.csv", row.names = FALSE)
-  write.csv(info_models_maxent, "info_models_maxent_all.csv", row.names = FALSE)
-  write.csv(info_models_maxent, paste0(dir2save_maxent, "info_models_maxent_all.csv"), row.names = FALSE)
-  #info_models_maxent <- fread("info_models_maxent_all.csv")
-  #info_models_maxent <- info_models_maxent[-3, ]
-  
-  print(paste0(t, " run in: ", running_time))
-  
-  
-}  
+}
 
+
+
+data2save_ReleveValid <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid.csv", header = TRUE)
+data2save_ReleveValid
+
+sps_kk <- unique(data2save_ReleveValid$species)[-1]
+sps_kk
+
+sps_kk_i <- sps_kk[2]
+sps_kk_i
+
+data2save_ReleveValid[species == sps_kk_i]
+
+data2save_ReleveValid[species == "Rumex obtusifolius"]
+
+
+
+max(data2save_ReleveValid$TSS)
+max(data2save_ReleveValid$Kappa)
+
+data2save_ReleveValid[TSS >= 0.5]
+data2save_ReleveValid[Kappa >= 0.4]
 
 
 

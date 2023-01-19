@@ -2099,17 +2099,17 @@ data2save_ReleveValid[Kappa >= 0.4]
 
 ## Comparing with "conventional" validation
 
-data2save_ReleveValid <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_01.zip", 
+data2save_ReleveValid_01 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_01.zip", 
                                       "info_models_maxent_ReleveValid.csv"), 
                                   header = TRUE, sep = ",") %>% data.table
 
-info_models_maxent_all <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_01.zip", 
+info_models_maxent_all_01 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_01.zip", 
                                        "info_models_maxent_all.csv"), 
                                    header = TRUE, sep = ",") %>% data.table
 
 
-info_models_maxent_all[species == "Bellis perennis", ]
-data2save_ReleveValid[species == "Bellis perennis", ]
+info_models_maxent_all_01[species == "Bellis perennis", ]
+data2save_ReleveValid_01[species == "Bellis perennis", ]
 
 info_models_maxent_all[species == "Galium verum", ]
 data2save_ReleveValid[species == "Galium verum", ]
