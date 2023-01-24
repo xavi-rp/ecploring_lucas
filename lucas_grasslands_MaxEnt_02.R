@@ -1973,6 +1973,79 @@ for(r in reps){
     
     
     
+  #  ## Calculating threshold dependent metrics  -->  this has not much sense because we do not have real absences
+  #  
+  #  pres4eval <- raster::extract(sps_preds_rstr, occs_i_shp, df = TRUE)
+  #  pres4eval$ID <- 1
+  #  head(pres4eval)
+  #  
+  #  backgr4eval <- raster::extract(sps_preds_rstr, bckgr, df = TRUE)
+  #  backgr4eval$ID <- 0
+  #  head(backgr4eval)
+  #  
+  #  points4eval <- rbind(pres4eval, backgr4eval)
+  #  names(points4eval) <- c("presence", "maxent_preds")
+  #  points4eval$ID_fake <- 1:nrow(points4eval)
+  #  points4eval <- points4eval[, c("ID_fake", "presence", "maxent_preds")]
+  #  points4eval <- points4eval[!is.na(points4eval$maxent_preds), ]
+  #  head(points4eval)
+  #  
+  #
+  #  
+  #  data2save_Valid_i <- c()
+  #  
+  #  for(tr in (1:length(thresholds))){
+  #    #print(names(thresholds)[t])
+  #    obs_pred_conf_i <- cmx(points4eval, 
+  #                           threshold = as.numeric(thresholds[tr]),
+  #                           na.rm = TRUE)
+  #    #print(obs_pred_conf_i)
+  #    
+  #    ## Proportion of correctly classified observations
+  #    #print(paste0("Prop Correctly Classified = ", round(pcc(obs_pred_conf_i, st.dev = F), 2)))
+  #    ProportionCorrectlyClassified <- round(pcc(obs_pred_conf_i, st.dev = F), 2)
+  #    #
+  #    ## Sensitivity = true positive rate
+  #    #print(paste0("True Positive Rate = ", sensitivity(obs_pred_conf_i, st.dev = F)))
+  #    TruePositiveRate <- round(sensitivity(obs_pred_conf_i, st.dev = F))
+  #    #
+  #    ## Specificity = true negative rate
+  #    #print(paste0("True Negative Rate = ", round(specificity(obs_pred_conf_i, st.dev = F), 2)))
+  #    TrueNegativeRate <- round(specificity(obs_pred_conf_i, st.dev = F), 2)
+  #    #
+  #    ## Kappa. According to Araujo et al. (2005), Kappa > 0.4 indicate good predictions. 
+  #    #print(paste0("Kappa = ", round(Kappa(obs_pred_conf_i, st.dev = F), 2)))
+  #    Kappa <- round(Kappa(obs_pred_conf_i, st.dev = F), 2)
+  #    #
+  #    ## True skill statistic (sensit+specit-1)
+  #    ## For TSS, we often assume TSS > 0.5 to indicate good predictions
+  #    #print(paste0("TSS = ", round((sensitivity(obs_pred_conf_i, st.dev = F) + 
+  #    #                          specificity(obs_pred_conf_i, st.dev = F) -
+  #    #                          1), 2)))
+  #    TSS <- round((sensitivity(obs_pred_conf_i, st.dev = F) + 
+  #                    specificity(obs_pred_conf_i, st.dev = F) -
+  #                    1), 2)
+  #    #
+  #    #
+  #    #
+  #    #print(" ")
+  #    
+  #    
+  #    data2save_Valid_i_i <- data.frame(species = t, 
+  #                                            repetition = r,
+  #                                            background_points,
+  #                                            threshold = names(thresholds)[tr], 
+  #                                            threshold_value = as.numeric(thresholds[tr]),
+  #                                            ProportionCorrectlyClassified,
+  #                                            TruePositiveRate,
+  #                                            TrueNegativeRate,
+  #                                            Kappa,
+  #                                            TSS)
+  #    
+  #    data2save_Valid_i <- rbind(data2save_Valid_i, data2save_Valid_i_i)
+  #  }
+    
+    
     
     
     #### Validating with releve data
@@ -2073,10 +2146,29 @@ for(r in reps){
     
     AUC_ROC <- round(AUC::auc(roc), 3)
     
+    
+    ## CBI
+    releve_point_sp_4modelling_laea_i[presence == 1, ]
+    releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
+    sps_preds_rstr[["predictions_maxent"]]
+    
+    BI_mxnt <- ecospat::ecospat.boyce(fit = sps_preds_rstr[["predictions_maxent"]],
+                                      obs = releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")], 
+                                      method = "pearson",
+                                      nclass = 0, 
+                                      window.w = "default", 
+                                      res = 100, 
+                                      PEplot = FALSE)
+    BI_mxnt
+    BI_mxnt$cor  # This is the CBI
+    
+    
+    
     data2save_ReleveValid_AUC_i <- data.frame(species = t, 
                                               repetition = r, 
                                               background_points,
-                                              AUC_ROC)
+                                              AUC_ROC, 
+                                              CBI = BI_mxnt$cor)
     
     
     data2save_ReleveValid_AUC <- rbind(data2save_ReleveValid_AUC, data2save_ReleveValid_AUC_i)
@@ -2117,49 +2209,223 @@ for(r in reps){
 
 info_models_maxent_all <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_all.csv", header = TRUE)
 info_models_maxent_all
+names(info_models_maxent_all)
+
+
+data2save_ReleveValid_AUC <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid_AUC.csv", header = TRUE)
+data2save_ReleveValid_AUC
+names(data2save_ReleveValid_AUC)
 
 
 data2save_ReleveValid <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid.csv", header = TRUE)
 data2save_ReleveValid
 
 
-sps_kk <- unique(data2save_ReleveValid$species)#[-1]
-sps_kk
+## Threshold-independent 
 
-sps_kk_i <- sps_kk[3]
-sps_kk_i
-
-data2save_ReleveValid[species == sps_kk_i]
-
-data2save_ReleveValid[species == "Rumex obtusifolius"]
-
-
-
-max(data2save_ReleveValid$TSS)
-max(data2save_ReleveValid$Kappa)
-
-data2save_ReleveValid[TSS >= 0.5]
-data2save_ReleveValid[Kappa >= 0.4]
-
+dta2plot_gbif <- info_models_maxent_all[, .SD, .SDcols = c("species", "auc.train", "auc.val", "cbi.train", "cbi.val")] %>%
+  group_by(species) %>%
+  summarise(n = n(), 
+            GBIF_AUC.train_mean = mean(auc.train), 
+            GBIF_AUC.train_SD = sd(auc.train), 
+            GBIF_AUC.val_mean = mean(auc.val), 
+            GBIF_AUC.val_SD = sd(auc.val),
+            GBIF_cbi.train_mean = mean(cbi.train), 
+            GBIF_cbi.train_SD = sd(cbi.train), 
+            GBIF_cbi.val_mean = mean(cbi.val), 
+            GBIF_cbi.val_SD = sd(cbi.val),
+  ) %>%
+  mutate_at(3:10, round, 3) %>%
+  data.table()
 
 
 
-## Comparing with "conventional" validation
+dta2plot_lucas <- data2save_ReleveValid_AUC[, .SD, .SDcols = c("species", "AUC_ROC", "CBI")]  %>%
+  group_by(species) %>%
+  summarise(n = n(), 
+            LUCAS_AUC.val_mean = mean(AUC_ROC), 
+            LUCAS_AUC.val_SD = sd(AUC_ROC), 
+            LUCAS_CBI.val_mean = mean(CBI), 
+            LUCAS_CBI.val_SD = sd(CBI), 
+  ) %>%
+  mutate_at(3:6, round, 3) %>%
+  data.table()
 
-data2save_ReleveValid_01 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_01.zip", 
-                                      "info_models_maxent_ReleveValid.csv"), 
-                                  header = TRUE, sep = ",") %>% data.table
 
-info_models_maxent_all_01 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_01.zip", 
-                                       "info_models_maxent_all.csv"), 
-                                   header = TRUE, sep = ",") %>% data.table
+dta2plot <- merge(dta2plot_gbif, dta2plot_lucas, by = "species") %>%
+  select(-c("n.x", "n.y")) %>%
+  pivot_longer(!species, 
+               names_pattern = "(.*)(_mean|_SD)$",
+               names_to = c("Metrics", "Statistic")) %>%
+  pivot_wider(names_from = Statistic, 
+              values_from = value) %>%
+  rename("Value" = `_mean`, "SD" = `_SD`)
+
+dta2plot
+
+library(viridis)
+
+jpeg("CompValidations_AUC_CBI.jpg", width = 20, height = 15, units = "cm", res = 150)
+
+ggplot(dta2plot, aes(fill = Metrics, y = Value, x = species)) + 
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  scale_fill_viridis(discrete = T) +
+  ggtitle("Threshold Independent Metrics") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")) +
+  ylim(0, 1) + xlab("Species") +
+  geom_errorbar(aes(ymin = Value - SD, ymax = Value + SD), width = 0.3,
+                position = position_dodge(0.9))
+
+dev.off()
+  
 
 
-info_models_maxent_all_01[species == "Bellis perennis", ]
-data2save_ReleveValid_01[species == "Bellis perennis", ]
 
-info_models_maxent_all[species == "Galium verum", ]
-data2save_ReleveValid[species == "Galium verum", ]
 
-data2save_ReleveValid[species == "Plantago media", ]
+## Threshold dependent: threshold used "spec_sens"
+
+names(info_models_maxent_all)
+
+threshold_used <- names(info_models_maxent_all)[info_models_maxent_all[1, ] == as.vector(info_models_maxent_all[1, "threshold_used"])][1]
+threshold_used
+
+
+#dta2plot_gbif <- info_models_maxent_all[, .SD, .SDcols = c("species", "cbi.train", "cbi.val")] %>%
+#  group_by(species) %>%
+#  summarise(n = n(), 
+#            GBIF_cbi.train_mean = mean(cbi.train), 
+#            GBIF_cbi.train_SD = sd(cbi.train), 
+#            GBIF_cbi.val_mean = mean(cbi.val), 
+#            GBIF_cbi.val_SD = sd(cbi.val),
+#            #GBIF_cbi.val_mean = mean(cbi.val)
+#  ) %>%
+#  mutate_at(3:6, round, 3) %>%
+#  data.table()
+#
+#dta2plot_gbif
+
+
+
+dta2plot_lucas <- data2save_ReleveValid[, .SD, .SDcols = c("species", "threshold", 
+                                                           "ProportionCorrectlyClassified",
+                                                           "TruePositiveRate", "TrueNegativeRate", 
+                                                           "Kappa", "TSS")]  %>%
+  group_by(species, threshold) %>%
+  summarise(n = n(), 
+            LUCAS_ProportionCorrectlyClassified_mean = mean(ProportionCorrectlyClassified), 
+            LUCAS_ProportionCorrectlyClassified_SD = sd(ProportionCorrectlyClassified), 
+            LUCAS_TruePositiveRate_mean = mean(TruePositiveRate), 
+            LUCAS_TruePositiveRate_SD = sd(TruePositiveRate), 
+            LUCAS_TrueNegativeRate_mean = mean(TrueNegativeRate), 
+            LUCAS_TrueNegativeRate_SD = sd(TrueNegativeRate), 
+            LUCAS_Kappa_mean = mean(Kappa), 
+            LUCAS_Kappa_SD = sd(Kappa), 
+            LUCAS_TSS_mean = mean(TSS), 
+            LUCAS_TSS_SD = sd(TSS),
+  ) %>%
+  mutate_at(4:13, round, 3) %>%
+  data.table()
+
+dta2plot_lucas
+
+
+
+
+#dta2plot <- merge(dta2plot_gbif, dta2plot_lucas[threshold == threshold_used, ], by = "species") %>%
+dta2plot <- dta2plot_lucas[threshold == threshold_used, ] %>%
+  select(-c("n")) %>%
+  pivot_longer(!c(species, threshold), 
+               names_pattern = "(.*)(_mean|_SD)$",
+               names_to = c("Metrics", "Statistic")) %>%
+  pivot_wider(names_from = Statistic, 
+              values_from = value) %>%
+  rename("value" = `_mean`, "SD" = `_SD`)
+
+dta2plot
+
+
+lvls2plot <- unique(dta2plot$Metrics)
+dta2plot$Metrics <- factor(dta2plot$Metrics, levels = lvls2plot)
+
+jpeg("CompValidations_ThresholdDep.jpg", width = 20, height = 15, units = "cm", res = 150)
+
+ggplot(dta2plot, aes(fill = Metrics, y = value, x = species)) + 
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  scale_fill_viridis(discrete = T, name = paste0("Metrics (threshold: '", threshold_used, "')")) +
+  ggtitle("Threshold Dependent Metrics") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"),
+        legend.title = element_text(face = "bold")) +
+  ylim(0, 1) + xlab("Species") +
+  geom_errorbar(aes(ymin = value - SD, ymax = value + SD), width = 0.3,
+                position = position_dodge(0.9))
+
+dev.off()
+
+
+
+
+
+
+## Threshold dependent: all threshold (Lucas), per species
+
+
+unique(dta2plot_lucas$species)
+
+sps_i <- unique(dta2plot_lucas$species)[1]
+sps_i
+
+
+head(dta2plot_lucas)
+
+
+dta2plot <- dta2plot_lucas %>%
+  select(-c("n")) %>%
+  pivot_longer(!c(species, threshold), 
+               names_pattern = "(.*)(_mean|_SD)$",
+               names_to = c("Metrics", "Statistic")) %>%
+  pivot_wider(names_from = Statistic, 
+              values_from = value) %>%
+  rename("value" = `_mean`, "SD" = `_SD`) %>%
+  data.table()
+
+dta2plot$Metrics <- factor(dta2plot$Metrics, 
+                           levels = unique(dta2plot$Metrics))
+                           #levels = lvls2plot)
+
+
+jpeg("CompValidations_ThresholdDep_allThresholds.jpg", width = 25, height = 20, units = "cm", res = 150)
+
+ggplot(dta2plot, aes(fill = Metrics, y = value, x = threshold)) + 
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  scale_fill_viridis(discrete = T,
+                     #limits = lvls2plot) +
+                     ) +
+  ggtitle(paste0("Threshold Dependent Metrics")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.text = element_text(size = 6),
+        strip.text = element_text(face = "italic")) +
+  ylim(0, 1) + xlab("Threshold") +
+  geom_errorbar(aes(ymin = value - SD, ymax = value + SD), width = 0.3,
+                position = position_dodge(0.9)) +
+  facet_wrap(~ species, nrow = 3, ncol = 2)
+
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
