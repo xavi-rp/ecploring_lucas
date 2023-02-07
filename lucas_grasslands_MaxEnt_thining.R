@@ -56,6 +56,7 @@ point_geom_surveyors
 nrow(point_geom_surveyors)  # 2622
 ncol(point_geom_surveyors)  #  127
 names(point_geom_surveyors)
+table(point_geom_surveyors$NUTS0)   # ES = 383
 
 
 sum(is.na(point_geom_surveyors$SURVEY_GRASS_GPS_LAT))  # no NAs
@@ -208,6 +209,7 @@ point_geom_experts
 
 nrow(point_geom_experts)   # 605
 names(point_geom_experts)  # 124+2
+table(point_geom_experts$NUTS0)  # ES = 53
 
 # EUNIS habitat classification
 sort(unique(point_geom_experts$SURVEY_GRASS_EUNIS_HABITAT))
@@ -2511,7 +2513,50 @@ dev.off()
 
 
 
+## Checking thinning results ####
 
+data2save_ReleveValid_AUC_01 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_thinning.zip", 
+                                         "info_models_maxent_ReleveValid_AUC.csv"), 
+                                     header = TRUE, sep = ",") %>% data.table
+
+info_models_maxent_all_01 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_thinning.zip", 
+                                          "info_models_maxent_all.csv"), 
+                                      header = TRUE, sep = ",") %>% data.table
+
+
+info_models_maxent_all_01[species == "Cerastium fontanum", ]
+data2save_ReleveValid_AUC_01[species == "Cerastium fontanum", ]
+
+
+
+dta2plot_1 <- info_models_maxent_all_01[species == "Cerastium fontanum", ] %>% 
+  group_by(thinning_dist) %>%
+  summarise(GBIF_AUC.val = mean(auc.val), GBIF_CBI.val = mean(cbi.val)) %>%
+  pivot_longer(!c(thinning_dist)) %>%
+  data.table()
+    
+dta2plot_2 <- data2save_ReleveValid_AUC_01[species == "Cerastium fontanum", ] %>% 
+  group_by(thinning_dist) %>%
+  summarise(LUCAS_AUC = mean(AUC_ROC), LUCAS_CBI = mean(CBI)) %>%
+  pivot_longer(!c(thinning_dist)) %>%
+  data.table()
+    
+dta2plot <- rbind(dta2plot_1, dta2plot_2)
+dta2plot
+
+library(viridis)
+
+jpeg("Thinning_CompValidations_AUC_CBI.jpg", width = 20, height = 20, units = "cm", res = 150)
+ggplot(dta2plot, 
+       aes(x = thinning_dist, y = value, color = name)) + 
+  geom_point() +
+  stat_smooth(method = 'lm', se = FALSE) +
+  scale_color_viridis(option = "viridis", discrete = TRUE) +
+  #ggtitle("Occurrences thinning: Cerastium fontanum") +
+  labs(title = "Occurrences thinning: Cerastium fontanum", x = "Thinning distance (Km)", y = " ",
+       colour = "Metrics") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
 
 
 

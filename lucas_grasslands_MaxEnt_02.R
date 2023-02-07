@@ -20,7 +20,7 @@ if(Sys.info()[4] == "D01RI1700308") {
   wd <- "D:/xavi_rp/D5_FFGRCC_lucas_grasslands/"
 }else if(Sys.info()[4] == "S-JRCIPRAP320P") {
   wd <- "D:/rotllxa/D5_FFGRCC_lucas_grasslands/"
-}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12" )) {
+}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12", "jeodpp-terminal-jd002-03")) {
   if(!dir.exists("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")) 
     dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")
   wd <- "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/"
