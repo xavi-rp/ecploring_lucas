@@ -2207,17 +2207,31 @@ for(r in reps){
 
 
 
-info_models_maxent_all <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_all.csv", header = TRUE)
+#info_models_maxent_all <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_all.csv", header = TRUE)
+info_models_maxent_all <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
+                                       "info_models_maxent_all.csv"), 
+                                   header = TRUE, sep = ",") %>% data.table
 info_models_maxent_all
 names(info_models_maxent_all)
 
 
-data2save_ReleveValid_AUC <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid_AUC.csv", header = TRUE)
+
+
+#data2save_ReleveValid_AUC <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid_AUC.csv", header = TRUE)
+data2save_ReleveValid_AUC <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
+                                          "info_models_maxent_ReleveValid_AUC.csv"), 
+                                      header = TRUE, sep = ",") %>% data.table
 data2save_ReleveValid_AUC
 names(data2save_ReleveValid_AUC)
 
 
-data2save_ReleveValid <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid.csv", header = TRUE)
+
+
+#data2save_ReleveValid <- fread("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/info_models_maxent_ReleveValid.csv", header = TRUE)
+data2save_ReleveValid <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
+                                      "info_models_maxent_ReleveValid.csv"), 
+                                  header = TRUE, sep = ",") %>% data.table
+data2save_ReleveValid
 data2save_ReleveValid
 
 
@@ -2417,12 +2431,124 @@ dev.off()
 
 
 
+## GBIF validations vs LUCAS validations
+
+# AUC_gbif vs AUC_lucas
+i
+info_models_maxent_all
+data2save_ReleveValid_AUC
+data2save_ReleveValid
+
+
+dta2plot_gbif <- info_models_maxent_all[, .SD, .SDcols = c("species", "auc.train", "auc.val", "cbi.train", "cbi.val")] %>%
+  group_by(species) %>%
+  summarise(n = n(), 
+            GBIF_AUC.train_mean = mean(auc.train), 
+            GBIF_AUC.train_SD = sd(auc.train), 
+            GBIF_AUC.val_mean = mean(auc.val), 
+            GBIF_AUC.val_SD = sd(auc.val),
+            GBIF_cbi.train_mean = mean(cbi.train), 
+            GBIF_cbi.train_SD = sd(cbi.train), 
+            GBIF_cbi.val_mean = mean(cbi.val), 
+            GBIF_cbi.val_SD = sd(cbi.val),
+  ) %>%
+  mutate_at(3:10, round, 3) %>%
+  data.table()
+
+dta2plot_gbif
 
 
 
+dta2plot_lucas <- data2save_ReleveValid_AUC[, .SD, .SDcols = c("species", "AUC_ROC", "CBI")]  %>%
+  group_by(species) %>%
+  summarise(n = n(), 
+            LUCAS_AUC.val_mean = mean(AUC_ROC), 
+            LUCAS_AUC.val_SD = sd(AUC_ROC), 
+            LUCAS_CBI.val_mean = mean(CBI), 
+            LUCAS_CBI.val_SD = sd(CBI), 
+  ) %>%
+  mutate_at(3:6, round, 3) %>%
+  data.table()
+
+dta2plot_lucas
+
+
+dta2plot <- merge(dta2plot_gbif, dta2plot_lucas, by = "species") %>%
+  select(-c("n.x", "n.y")) %>%
+  pivot_longer(!species, 
+               names_pattern = "(.*)(_mean|_SD)$",
+               names_to = c("Metrics", "Statistic")) %>%
+  pivot_wider(names_from = Statistic, 
+              values_from = value) %>%
+  rename("Value" = `_mean`, "SD" = `_SD`) %>%
+  data.table()
+
+dta2plot
+
+
+dta2plot_1 <- dta2plot %>% 
+  select(-SD) %>%
+  filter(Metrics == "GBIF_AUC.val" | Metrics == "LUCAS_AUC.val") %>%
+  pivot_wider(names_from = c(Metrics), values_from = Value)
+
+plot1 <- ggplot(dta2plot_1, aes(LUCAS_AUC.val, GBIF_AUC.val)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  #geom_smooth(method = lm, se = FALSE) 
+  geom_abline(slope = 1, intercept = 0)
 
 
 
+dta2plot_2 <- dta2plot %>% 
+  select(-SD) %>%
+  filter(Metrics == "GBIF_cbi.val" | Metrics == "LUCAS_CBI.val") %>%
+  pivot_wider(names_from = c(Metrics), values_from = Value)
+
+plot2 <- ggplot(dta2plot_2, aes(LUCAS_CBI.val, GBIF_cbi.val)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  #geom_smooth(method = lm, se = FALSE) 
+  geom_abline(slope = 1, intercept = 0)
+
+
+library(gridExtra)
+
+#jpeg("GBIFval_vs_LUCASval_AUC_CBI_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+jpeg("GBIFval_vs_LUCASval_AUC_CBI.jpg", width = 30, height = 15, units = "cm", res = 150)
+grid.arrange(plot1, plot2, ncol = 2)
+dev.off()
+
+
+
+# AUC_gbif vs TypeI/TypeII errors (by threshold)
+
+select(dta2plot_1, !LUCAS_AUC.val)
+
+data2save_ReleveValid 
+dta2plot_lucas
+names(dta2plot_lucas)
+select(dta2plot_lucas, c(species, threshold, LUCAS_TSS_mean))
+
+
+dta2plot_3 <- merge(select(dta2plot_1, !LUCAS_AUC.val),
+                    select(dta2plot_lucas, c(species, threshold, LUCAS_TSS_mean))
+                    )
+dta2plot_3
+
+
+plot_3 <-  ggplot(dta2plot_3, 
+                  aes(LUCAS_TSS_mean, GBIF_AUC.val)) +
+  geom_point() +
+  xlim(0, 1) +
+  ylim(0, 1) +
+  geom_abline(slope = 1, intercept = 0) +
+  facet_wrap(~ threshold, nrow = 2, ncol = 4)  
+
+jpeg("GBIFval_vs_LUCASval_AUC_TSS_allThresholds_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+plot_3
+dev.off()
 
 
 
