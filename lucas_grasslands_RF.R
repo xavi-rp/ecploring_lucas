@@ -2109,18 +2109,23 @@ for(r in reps){
       #
       #
       #print(" ")
+      TypeI <- 1 - TrueNegativeRate   # 1 - specificity 
+      TypeII <- 1 - TruePositiveRate   # 1 - sensitivity 
+      
       
       
       data2save_Valid_i_i <- data.frame(species = t, 
-                                              repetition = r,
-                                              background_points,
-                                              threshold = names(thresholds)[tr], 
-                                              threshold_value = as.numeric(thresholds[tr]),
-                                              ProportionCorrectlyClassified,
-                                              TruePositiveRate,
-                                              TrueNegativeRate,
-                                              Kappa,
-                                              TSS)
+                                        repetition = r,
+                                        background_points,
+                                        threshold = names(thresholds)[tr], 
+                                        threshold_value = as.numeric(thresholds[tr]),
+                                        ProportionCorrectlyClassified,
+                                        TruePositiveRate,
+                                        TrueNegativeRate,
+                                        TypeI,
+                                        TypeII,
+                                        Kappa,
+                                        TSS)
       
       data2save_Valid_i <- rbind(data2save_Valid_i, data2save_Valid_i_i)
     }
@@ -2190,6 +2195,8 @@ for(r in reps){
       #
       #
       #print(" ")
+      TypeI <- 1 - TrueNegativeRate   # 1 - specificity 
+      TypeII <- 1 - TruePositiveRate   # 1 - sensitivity 
       
       
       data2save_ReleveValid_i_i <- data.frame(species = t, 
@@ -2200,6 +2207,8 @@ for(r in reps){
                                               ProportionCorrectlyClassified,
                                               TruePositiveRate,
                                               TrueNegativeRate,
+                                              TypeI,
+                                              TypeII,
                                               Kappa,
                                               TSS)
       
@@ -2709,7 +2718,7 @@ dev.off()
 
 
 
-# AUC_gbif vs TypeI/TypeII errors (by threshold)
+## AUC_gbif vs TSS errors (by threshold)
 
 select(dta2plot_1, !LUCAS_AUC.val)
 
@@ -2773,6 +2782,271 @@ plot_3
 dev.off()
 
 
+
+
+## by species prevalence
+
+
+occs_i_rstr
+occs_i_rstr_vals <- getValues(occs_i_rstr)
+all_cells <- sum(!is.na(occs_i_rstr_vals))
+all_cells
+
+
+sps_prevalence <- data.frame(species = info_models_RF_DS_all$species, prevalence = (info_models_RF_DS_all$occurrences_1km / all_cells))
+sps_prevalence <- sps_prevalence[!duplicated(sps_prevalence$species), ]
+sps_prevalence
+range(sps_prevalence$prevalence)  # 5.208127e-05, 7.925767e-03
+
+
+
+dta2plot_lucas_RF_DS <- info_models_RF_DS_ReleveValid[, .SD, .SDcols = c("species", "algorithm", "threshold", "TSS")] %>%   
+  #filter(algorithm == "RF_DS") %>%
+  group_by(species, threshold, algorithm) %>%
+  summarise(n = n(), 
+            LUCAS_TSS_mean = mean(TSS), 
+            LUCAS_TSS_SD = sd(TSS)) %>%
+  mutate_at(4:5, round, 3) %>%
+  data.table()
+
+dta2plot_lucas_maxent <- info_models_maxent_ReleveValid[, .SD, .SDcols = c("species", "algorithm", "threshold", "TSS")] %>%   
+  #filter(algorithm == "RF_DS") %>%
+  group_by(species, threshold, algorithm) %>%
+  summarise(n = n(), 
+            LUCAS_TSS_mean = mean(TSS), 
+            LUCAS_TSS_SD = sd(TSS)) %>%
+  mutate_at(4:5, round, 3) %>%
+  data.table()
+
+
+dta2plot_lucas <- rbind(dta2plot_lucas_maxent, dta2plot_lucas_RF_DS)
+
+dta2plot_lucas <- merge(dta2plot_lucas, sps_prevalence, by = "species", all.x = TRUE)
+dta2plot_lucas
+
+
+plot_4 <-  ggplot(dta2plot_lucas, 
+                  aes(prevalence, LUCAS_TSS_mean, colour = factor(algorithm))) +
+  geom_point() +
+  #xlim(0, 1) +
+  #ylim(0, 1) #+
+  #geom_abline(slope = 1, intercept = 0) #+
+  stat_smooth(method = 'lm', se = TRUE) +
+  #ggpmisc::stat_poly_line(se = FALSE) +
+  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+  #  after_stat(rr.label),
+  #  after_stat(p.value.label), sep = "*\", \"*"))) +
+  facet_wrap(~ threshold, nrow = 2, ncol = 4)  
+
+plot_4
+                  
+
+jpeg("LUCASval_TSS_Prevalence_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+plot_4
+dev.off()
+
+
+
+# AUC, CBI
+
+dta2plot_5 <- merge(dta2plot_1, sps_prevalence, by = "species", all.x = TRUE)
+dta2plot_6 <- merge(dta2plot_2, sps_prevalence, by = "species", all.x = TRUE)
+
+plot5 <- ggplot(dta2plot_5, aes(prevalence, GBIF_AUC.val, colour = factor(algorithm))) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) 
+  #ggpmisc::stat_poly_line(se = FALSE) +
+  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+  #  after_stat(rr.label),
+  #  after_stat(p.value.label), sep = "*\", \"*"))) 
+  
+
+plot51 <- ggplot(dta2plot_5, aes(prevalence, LUCAS_AUC.val, colour = factor(algorithm))) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) 
+  #ggpmisc::stat_poly_line(se = FALSE) +
+  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+  #  after_stat(rr.label),
+  #  after_stat(p.value.label), sep = "*\", \"*"))) 
+  
+grid.arrange(plot5, plot51, ncol = 2)
+
+
+
+plot6 <- ggplot(dta2plot_6, aes(prevalence, GBIF_cbi.val, colour = factor(algorithm))) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) 
+  #ggpmisc::stat_poly_line(se = FALSE) +
+  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+  #  after_stat(rr.label),
+  #  after_stat(p.value.label), sep = "*\", \"*"))) 
+  
+
+plot61 <- ggplot(dta2plot_6, aes(prevalence, LUCAS_CBI.val, colour = factor(algorithm))) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) 
+  #ggpmisc::stat_poly_line(se = FALSE) +
+  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+  #  after_stat(rr.label),
+  #  after_stat(p.value.label), sep = "*\", \"*")))
+  
+
+grid.arrange(plot6, plot61, ncol = 2)
+
+
+
+jpeg("LUCASval_prevalence_AUC_CBI_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 30, units = "cm", res = 150)
+grid.arrange(plot5, plot51, plot6, plot61, ncol = 2)
+dev.off()
+
+
+
+
+
+##  TypeI/TypeII errors (by threshold)
+
+run_this <- "no"
+if(run_this == "yes"){
+  info_models_RF_DS_ReleveValid_1 <- info_models_RF_DS_ReleveValid
+  
+  #TypeI <- 1 - TrueNegativeRate   # 1 - specificity 
+  #TypeII <- 1 - TruePositiveRate   # 1 - sensitivity 
+  
+  info_models_RF_DS_ReleveValid_1[, TypeI := (1 - TrueNegativeRate)]
+  info_models_RF_DS_ReleveValid_1[, TypeII := (1 - TruePositiveRate)]
+  
+  info_models_RF_DS_ReleveValid <- info_models_RF_DS_ReleveValid_1
+  
+  
+  info_models_maxent_ReleveValid[, TypeI := (1 - TrueNegativeRate)]
+  info_models_maxent_ReleveValid[, TypeII := (1 - TruePositiveRate)]
+
+}
+
+
+
+info_models_RF_DS_ReleveValid
+
+
+dta2plot_lucas_RF_DS <- info_models_RF_DS_ReleveValid[, .SD, .SDcols = c("species", "algorithm", "threshold", "TSS", "TypeI", "TypeII")]  %>%
+  group_by(species, threshold) %>%
+  summarise(n = n(), 
+            LUCAS_TSS_mean = mean(TSS), 
+            LUCAS_TSS_SD = sd(TSS), 
+            LUCAS_TypeI_mean = mean(TypeI), 
+            LUCAS_TypeI_SD = sd(TypeI), 
+            LUCAS_TypeII_mean = mean(TypeII), 
+            LUCAS_TypeII_SD = sd(TypeII), 
+  ) %>%
+  mutate_at(4:6, round, 3) %>%
+  data.table()
+
+dta2plot_lucas_RF_DS
+dta2plot_lucas_RF_DS[, algorithm := "RF_DS"]
+
+
+dta2plot_lucas_maxent <- info_models_maxent_ReleveValid[, .SD, .SDcols = c("species", "algorithm", "threshold", "TSS", "TypeI", "TypeII")]  %>%
+  group_by(species, threshold) %>%
+  summarise(n = n(), 
+            LUCAS_TSS_mean = mean(TSS), 
+            LUCAS_TSS_SD = sd(TSS), 
+            LUCAS_TypeI_mean = mean(TypeI), 
+            LUCAS_TypeI_SD = sd(TypeI), 
+            LUCAS_TypeII_mean = mean(TypeII), 
+            LUCAS_TypeII_SD = sd(TypeII), 
+  ) %>%
+  mutate_at(4:6, round, 3) %>%
+  data.table()
+
+dta2plot_lucas_maxent
+dta2plot_lucas_maxent[, algorithm := "MaxEnt"]
+
+dta2plot_lucas <- rbind(dta2plot_lucas_maxent, dta2plot_lucas_RF_DS)
+
+names(dta2plot_lucas)
+
+
+
+## 3D plot: TSS against Type I and II errors (LUCAS validat)
+library(plotly)
+plot_ly(dta2plot_lucas[threshold == "equal_sens_spec"],
+        x = ~LUCAS_TypeI_mean,
+        y = ~LUCAS_TypeII_mean, 
+        z = ~LUCAS_TSS_mean, 
+        type = "scatter3d", 
+        mode = "markers", 
+        color = ~algorithm) %>%
+  layout(scene = list(xaxis = list(title = "Type I"),
+                      yaxis = list(title = "Type II"),
+                      zaxis = list(title = "TSS")))
+
+# difficult to see anything
+
+
+
+
+## Type I against Type II
+
+dta2plot_lucas
+
+
+plot_7 <-  ggplot(dta2plot_lucas, 
+                  #aes(LUCAS_TypeI_mean, LUCAS_TSS_mean, colour = factor(algorithm))) +
+                  aes(LUCAS_TypeI_mean, LUCAS_TypeII_mean, colour = factor(algorithm))) +
+  geom_point() +
+  #xlim(0, 1) +
+  #ylim(0, 1) #+
+  #geom_abline(slope = 1, intercept = 0) #+
+  stat_smooth(method = 'lm', se = TRUE) +
+  #ggpmisc::stat_poly_line(se = FALSE) +
+  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+  #  after_stat(rr.label),
+  #  after_stat(p.value.label), sep = "*\", \"*"))) +
+  facet_wrap(~ threshold, nrow = 2, ncol = 4)  
+
+plot_7
+
+
+
+# boxplots
+library(tidyverse)
+
+dta2plot_lucas_1 <- dta2plot_lucas %>% 
+  select(!ends_with("_SD")) %>%
+  pivot_longer(!c(species, algorithm, threshold, n), 
+               names_to = c("Statistic")) 
+
+dta2plot_lucas_1$Statistic <- gsub("_mean", "", dta2plot_lucas_1$Statistic)
+
+
+plot_8 <- ggplot(dta2plot_lucas_1, aes(x = Statistic, y = value, color = algorithm)) + 
+  geom_boxplot() +
+  facet_wrap(~ threshold, nrow = 2, ncol = 4) +
+  theme(axis.text.x = element_text(angle = - 45, vjust = 0.5, hjust = 0.1))
+
+plot_8
+
+jpeg("LUCASval_TSS_TypeI_TypeII_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+plot_8
+dev.off()
+
+
+dta2plot_lucas_1 %>% 
+  #group_by(Statistic, algorithm, threshold) %>%
+  group_by(Statistic, algorithm) %>%
+  summarise(n = n(), 
+            mean = mean(value),
+            SD = sd(value)) %>%
+  mutate_at(4:5, round, 3) %>%
+  data.table()
+
+#      Statistic   algorithm    n    mean      SD
+#      LUCAS_TSS      MaxEnt   42   0.155   0.170
+#      LUCAS_TSS       RF_DS   42   0.128   0.154
+#    LUCAS_TypeI      MaxEnt   42   0.276   0.315
+#    LUCAS_TypeI       RF_DS   42   0.229   0.286
+#   LUCAS_TypeII      MaxEnt   42   0.571   0.485
+#   LUCAS_TypeII       RF_DS   42   0.730   0.443
 
 
 
