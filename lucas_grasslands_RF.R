@@ -1694,8 +1694,8 @@ threshold2use <- "spec_sens"    # sum of the sensitivity (true positive rate) an
 Sys.time()
 
 #taxons <- unique(releve_point_sp_4modelling_pres_laea$species)
-taxons <- unique(occs_all_releve_1_laea$species);   taxons
 taxons <- c("Avena barbata", "Leontodon hispidus", "Cerastium fontanum", "Rumex obtusifolius", "Trifolium repens", "Festuca rubra")
+taxons <- unique(occs_all_releve_1_laea$species);   taxons  # 62
 
 occs_all <- occs_all_releve_1_laea;   length(unique(occs_all$species))
 reps <- 1:5
@@ -1865,24 +1865,27 @@ for(r in reps){
     
     
     #dev.off()
-    png(paste0(dir2save_rf, "opt_model_RespCurves_RF_", t, "_", r, ".png"), 
-        width = 25, height = 25, units = "cm", res = 300)
-
-    par(mfrow = c(ceiling(sqrt(length(names(all_vars)))), 
-                  floor(sqrt(length(names(all_vars))))))
-    
-    for(v in names(all_vars)){
-      #print(v)
-      partialPlot(x = rf_DownSampling,
-                  pred.data = data4training[pres == "1", -c("pres")], 
-                  x.var = as.vector(v), 
-                  which.class = "1",
-                  xlab = as.character(v),
-                  main = "")
+    if(r == 1){
+      png(paste0(dir2save_rf, "opt_model_RespCurves_RF_", t, "_", r, ".png"), 
+          width = 25, height = 25, units = "cm", res = 300)
+      
+      par(mfrow = c(ceiling(sqrt(length(names(all_vars)))), 
+                    floor(sqrt(length(names(all_vars))))))
+      
+      for(v in names(all_vars)){
+        #print(v)
+        partialPlot(x = rf_DownSampling,
+                    pred.data = data4training[pres == "1", -c("pres")], 
+                    x.var = as.vector(v), 
+                    which.class = "1",
+                    xlab = as.character(v),
+                    main = "")
+      }
+      
+      dev.off()
+      
     }
-    
-    dev.off()
-    
+  
     
     
     all_vars_data0 <- as.data.table(as.data.frame(all_vars[[1]]))
@@ -1923,9 +1926,19 @@ for(r in reps){
                                                   spatial = FALSE)
     sps_data_presences_train_coords
     
-    # 
+    
+    check_obs <- raster::extract(sps_preds_rstr, sps_data_presences_train_coords)
+    # this is just in case there are no predictions (NA) in the testing points
+    if(any(is.na(check_obs))){
+      obs_points <- sps_data_presences_train_coords
+      obs_points <- obs_points[-which(is.na(check_obs))]
+    }else{
+      obs_points <- sps_data_presences_train_coords
+    }
+    
+     
     BI_RF <- ecospat::ecospat.boyce(fit = sps_preds_rstr,
-                                    obs = sps_data_presences_train_coords, 
+                                    obs = obs_points, 
                                     nclass = 0, 
                                     window.w = "default", 
                                     res = 100, 
@@ -1960,8 +1973,19 @@ for(r in reps){
                                                  spatial = FALSE)
     sps_data_presences_test_coords
     
+    
+    check_obs <- raster::extract(sps_preds_rstr, sps_data_presences_test_coords)
+    # this is just in case there are no predictions (NA) in the testing points
+    if(any(is.na(check_obs))){
+      obs_points <- sps_data_presences_test_coords
+      obs_points <- obs_points[-which(is.na(check_obs))]
+    }else{
+      obs_points <- sps_data_presences_test_coords
+    }
+    
+    
     BI_RF_val <- ecospat::ecospat.boyce(fit = sps_preds_rstr,
-                                        obs = sps_data_presences_test_coords, 
+                                        obs = obs_points, 
                                         nclass = 0, 
                                         window.w = "default", 
                                         res = 100, 
@@ -2242,8 +2266,19 @@ for(r in reps){
     releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
     sps_preds_rstr[["predictions_RF_DownSampling"]]
     
+    
+    check_obs <- raster::extract(sps_preds_rstr[["predictions_RF_DownSampling"]], releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")])
+    # this is just in case there are no predictions (NA) in the testing points
+    if(any(is.na(check_obs))){
+      obs_points <- releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
+      obs_points <- obs_points[-which(is.na(check_obs))]
+    }else{
+      obs_points <- releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
+    }
+ 
+    
     BI_RF_DS <- ecospat::ecospat.boyce(fit = sps_preds_rstr[["predictions_RF_DownSampling"]],
-                                       obs = releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")], 
+                                       obs = obs_points, 
                                        method = "pearson",
                                        nclass = 0, 
                                        window.w = "default", 
@@ -2715,6 +2750,32 @@ library(gridExtra)
 jpeg("GBIFval_vs_LUCASval_AUC_CBI_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
 grid.arrange(plot1, plot2, ncol = 2)
 dev.off()
+
+
+
+
+dta2plot_1
+dta2plot_2
+
+dta2plot_12 <- merge(dta2plot_1, dta2plot_2)
+
+
+dta2plot_12 %>% 
+  group_by(algorithm) %>%
+  summarise(n = n(), 
+            LUCAS_AUC_mean = mean(LUCAS_AUC.val),
+            LUCAS_AUC_SD = sd(LUCAS_AUC.val),
+            LUCAS_CBI_mean = mean(LUCAS_CBI.val),
+            LUCAS_CBI_SD = sd(LUCAS_CBI.val)) %>%
+  mutate_at(3:6, round, 3) %>%
+  data.table()
+
+# algorithm  n  LUCAS_AUC_mean  LUCAS_AUC_SD  LUCAS_CBI_mean  LUCAS_CBI_SD
+#    MaxEnt  6           0.672         0.103           0.463         0.289
+#     RF_DS  6           0.718         0.108           0.300         0.353
+
+
+
 
 
 

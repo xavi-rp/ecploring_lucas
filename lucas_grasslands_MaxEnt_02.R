@@ -2152,8 +2152,19 @@ for(r in reps){
     releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
     sps_preds_rstr[["predictions_maxent"]]
     
+    
+    check_obs <- raster::extract(sps_preds_rstr[["predictions_maxent"]], releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")])
+    # this is just in case there are no predictions (NA) in the testing points
+    if(any(is.na(check_obs))){
+      obs_points <- releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
+      obs_points <- obs_points[-which(is.na(check_obs))]
+    }else{
+      obs_points <- releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")]
+    }
+    
+  
     BI_mxnt <- ecospat::ecospat.boyce(fit = sps_preds_rstr[["predictions_maxent"]],
-                                      obs = releve_point_sp_4modelling_laea_i[presence == 1, .SD, .SDcols = c("X", "Y")], 
+                                      obs = obs_points, 
                                       method = "pearson",
                                       nclass = 0, 
                                       window.w = "default", 
