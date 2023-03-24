@@ -1680,11 +1680,12 @@ threshold2use <- "spec_sens"    # sum of the sensitivity (true positive rate) an
 Sys.time()
 
 #taxons <- unique(releve_point_sp_4modelling_pres_laea$species)
-taxons <- unique(occs_all_releve_1_laea$species);   taxons
 taxons <- c("Avena barbata", "Leontodon hispidus", "Cerastium fontanum", "Rumex obtusifolius", "Trifolium repens", "Festuca rubra")
+taxons <- unique(occs_all_releve_1_laea$species);   taxons
 
 occs_all <- occs_all_releve_1_laea;   length(unique(occs_all$species))
 reps <- 1:5
+reps <- 1:3
 
 
 for(r in reps){
@@ -1740,6 +1741,18 @@ for(r in reps){
     rm(sps_data); gc()
     
     # data set for pseudo-absences
+    # data set for pseudo-absences
+    if(occurrences_1km > nrow(bckgr_100)){
+      bckgr <- bckgr_200
+    } else if (occurrences_1km > nrow(bckgr_50)){
+      bckgr <- bckgr_100
+    } else if (occurrences_1km > nrow(bckgr_25)){
+      bckgr <- bckgr_50
+    } else if (occurrences_1km > nrow(bckgr_15)){
+      bckgr <- bckgr_25
+    } else {
+      bckgr <- bckgr_15
+    }
     sps_data_absences <- as.data.table(as.data.frame(raster::extract(all_vars, bckgr, cellnumbers = TRUE)))
     sps_data_absences <- sps_data_absences[!sps_data_absences$cells %in% sps_data_presences$raster_position, ]
     names(sps_data_absences)
@@ -1805,7 +1818,8 @@ for(r in reps){
     
     
     #fc_opts <- list(c("L","LQ","LQH","H"), c("L","LQ","LQH"), c("L","LQ"), "L")
-    fc_opts <- list(c("L","LQ", "LQH"), c("LQ"), "L")
+    #fc_opts <- list(c("L","LQ", "LQH"), c("LQ"), "L")
+    fc_opts <- list(c("LQ", "LQH"), c("LQ"), "L")
     
     for(fc in fc_opts){
       modl <- dir_func(sps_data_presences, all_vars, sps_data_absences, fc)
@@ -1840,13 +1854,16 @@ for(r in reps){
     #str(modl_args)
     
     #dev.off()
-    pdf(paste0(dir2save_maxent, "opt_model_RespCurves_", t, "_", r, ".pdf"))
-    plot(modl_args, type = "cloglog")
-    # And these are the marginal response curves for the predictor variables wit non-zero 
-    # coefficients in our model. We define the y-axis to be the cloglog transformation, which
-    # is an approximation of occurrence probability (with assumptions) bounded by 0 and 1
-    # (Phillips et al. 2017).
-    dev.off()
+    if(r == 1){
+      pdf(paste0(dir2save_maxent, "opt_model_RespCurves_", t, "_", r, ".pdf"))
+      plot(modl_args, type = "cloglog")
+      # And these are the marginal response curves for the predictor variables wit non-zero 
+      # coefficients in our model. We define the y-axis to be the cloglog transformation, which
+      # is an approximation of occurrence probability (with assumptions) bounded by 0 and 1
+      # (Phillips et al. 2017).
+      dev.off()
+    }
+      
     
     modl <- modl@models[[optimal$tune.args]]
     gc()

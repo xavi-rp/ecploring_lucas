@@ -1651,12 +1651,14 @@ occs_all_releve_1_laea
 #                             #n = 10000)
 #                             #n = 15000)
 #                             #n = 25000)
-#                             n = 50000)
+#                             #n = 50000)
+#                             #n = 100000)
+#                             n = 200000)
 #bckgr <- as.data.frame(bckgr)
 #head(bckgr)
 #nrow(bckgr)
 #
-#write.csv(bckgr, "background_points_50K.csv", row.names = FALSE)
+#write.csv(bckgr, "background_points_200K.csv", row.names = FALSE)
 
 
 bckgr_25 <- read.csv("background_points_25K.csv", header = TRUE)
@@ -1664,6 +1666,12 @@ nrow(bckgr_25)
 
 bckgr_50 <- read.csv("background_points_50K.csv", header = TRUE)
 nrow(bckgr_50)
+
+bckgr_100 <- read.csv("background_points_100K.csv", header = TRUE)
+nrow(bckgr_100)
+
+bckgr_200 <- read.csv("background_points_200K.csv", header = TRUE)
+nrow(bckgr_200)
 
 bckgr_15 <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/Maxent_BackgroundAssessment.zip", 
                       paste0("background_points_", 15000, ".csv")),
@@ -1700,7 +1708,7 @@ taxons <- unique(occs_all_releve_1_laea$species);   taxons  # 62
 occs_all <- occs_all_releve_1_laea;   length(unique(occs_all$species))
 reps <- 1:5
 reps <- 1:3
-
+#reps <- 2:3
 
 for(r in reps){
   #r <- reps[1]
@@ -1755,7 +1763,11 @@ for(r in reps){
     rm(sps_data); gc()
     
     # data set for pseudo-absences
-    if(occurrences_1km > nrow(bckgr_25)){
+    if(occurrences_1km > nrow(bckgr_100)){
+      bckgr <- bckgr_200
+    } else if (occurrences_1km > nrow(bckgr_50)){
+      bckgr <- bckgr_100
+    } else if (occurrences_1km > nrow(bckgr_25)){
       bckgr <- bckgr_50
     } else if (occurrences_1km > nrow(bckgr_15)){
       bckgr <- bckgr_25
@@ -2563,7 +2575,7 @@ if(updated_RF == "Yes"){
 
 
 
-## GBIF validations vs LUCAS validations
+## GBIF validations vs LUCAS validations ####
 
 # AUC_gbif vs AUC_lucas
 i
@@ -2575,27 +2587,31 @@ data2save_ReleveValid
 
 # MaxEnt results
 
-info_models_maxent_all <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
-                                       "info_models_maxent_all.csv"), 
-                                   header = TRUE, sep = ",") %>% data.table
+#info_models_maxent_all <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
+#                                       "info_models_maxent_all.csv"), 
+#                                   header = TRUE, sep = ",") %>% data.table
+
+info_models_maxent_all <- fread("MaxEnt_allSp/info_models_maxent_all.csv", header = TRUE)
 info_models_maxent_all[, algorithm := "MaxEnt"]
 info_models_maxent_all
 names(info_models_maxent_all)
 
 
 
-info_models_maxent_ReleveValid_AUC <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
-                                       "info_models_maxent_ReleveValid_AUC.csv"), 
-                                   header = TRUE, sep = ",") %>% data.table
+#info_models_maxent_ReleveValid_AUC <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
+#                                       "info_models_maxent_ReleveValid_AUC.csv"), 
+#                                   header = TRUE, sep = ",") %>% data.table
+info_models_maxent_ReleveValid_AUC <- fread("MaxEnt_allSp/info_models_maxent_ReleveValid_AUC.csv", header = TRUE)
 info_models_maxent_ReleveValid_AUC[, algorithm := "MaxEnt"]
 info_models_maxent_ReleveValid_AUC
 names(info_models_maxent_ReleveValid_AUC)
 
 
 
-info_models_maxent_ReleveValid <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
-                                       "info_models_maxent_ReleveValid.csv"), 
-                                   header = TRUE, sep = ",") %>% data.table
+#info_models_maxent_ReleveValid <- read.csv(unz("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/MaxEnt_02_CompTests.zip", 
+#                                       "info_models_maxent_ReleveValid.csv"), 
+#                                   header = TRUE, sep = ",") %>% data.table
+info_models_maxent_ReleveValid <- fread("MaxEnt_allSp/info_models_maxent_ReleveValid.csv", header = TRUE)
 info_models_maxent_ReleveValid[, algorithm := "MaxEnt"]
 info_models_maxent_ReleveValid
 names(info_models_maxent_ReleveValid)
@@ -2604,15 +2620,18 @@ names(info_models_maxent_ReleveValid)
 
 
 # RF_DS
-info_models_RF_DS_all <- fread("info_models_RF_DS_all.csv", header = TRUE)
+#info_models_RF_DS_all <- fread("info_models_RF_DS_all.csv", header = TRUE)
+info_models_RF_DS_all <- fread("RF_DS_allSp/info_models_RF_DS_all.csv", header = TRUE)
 info_models_RF_DS_all[, algorithm := "RF_DS"]
 names(info_models_RF_DS_all)
 
-info_models_RF_DS_ReleveValid_AUC <- fread("info_models_RF_DS_ReleveValid_AUC.csv", header = TRUE)
+#info_models_RF_DS_ReleveValid_AUC <- fread("info_models_RF_DS_ReleveValid_AUC.csv", header = TRUE)
+info_models_RF_DS_ReleveValid_AUC <- fread("RF_DS_allSp/info_models_RF_DS_ReleveValid_AUC.csv", header = TRUE)
 info_models_RF_DS_ReleveValid_AUC[, algorithm := "RF_DS"]
 names(info_models_RF_DS_ReleveValid_AUC)
 
-info_models_RF_DS_ReleveValid <- fread("info_models_RF_DS_ReleveValid.csv", header = TRUE)
+#info_models_RF_DS_ReleveValid <- fread("info_models_RF_DS_ReleveValid.csv", header = TRUE)
+info_models_RF_DS_ReleveValid <- fread("RF_DS_allSp/info_models_RF_DS_ReleveValid.csv", header = TRUE)
 info_models_RF_DS_ReleveValid[, algorithm := "RF_DS"]
 names(info_models_RF_DS_ReleveValid)
 
@@ -2747,7 +2766,8 @@ plot2 <- ggplot(dta2plot_2, aes(LUCAS_CBI.val, GBIF_cbi.val, colour = factor(alg
 library(gridExtra)
 
 #jpeg("GBIFval_vs_LUCASval_AUC_CBI_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
-jpeg("GBIFval_vs_LUCASval_AUC_CBI_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+#jpeg("GBIFval_vs_LUCASval_AUC_CBI_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+jpeg("GBIFval_vs_LUCASval_AUC_CBI_MaxEnt_RF_DS.jpg", width = 30, height = 15, units = "cm", res = 150)
 grid.arrange(plot1, plot2, ncol = 2)
 dev.off()
 
@@ -2774,6 +2794,10 @@ dta2plot_12 %>%
 #    MaxEnt  6           0.672         0.103           0.463         0.289
 #     RF_DS  6           0.718         0.108           0.300         0.353
 
+
+# algorithm  n LUCAS_AUC_mean LUCAS_AUC_SD LUCAS_CBI_mean LUCAS_CBI_SD
+#    MaxEnt 62          0.558        0.116         -0.023        0.515
+#     RF_DS 62          0.605        0.113          0.018        0.428
 
 
 
@@ -2838,7 +2862,8 @@ plot_3 <-  ggplot(dta2plot_3,
   geom_abline(slope = 1, intercept = 0) +
   facet_wrap(~ threshold, nrow = 2, ncol = 4)  
 
-jpeg("GBIFval_vs_LUCASval_AUC_TSS_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+#jpeg("GBIFval_vs_LUCASval_AUC_TSS_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+jpeg("GBIFval_vs_LUCASval_AUC_TSS_allThresholds_MaxEnt_RF_DS.jpg", width = 30, height = 15, units = "cm", res = 150)
 plot_3
 dev.off()
 
@@ -2857,7 +2882,8 @@ all_cells
 sps_prevalence <- data.frame(species = info_models_RF_DS_all$species, prevalence = (info_models_RF_DS_all$occurrences_1km / all_cells))
 sps_prevalence <- sps_prevalence[!duplicated(sps_prevalence$species), ]
 sps_prevalence
-range(sps_prevalence$prevalence)  # 5.208127e-05, 7.925767e-03
+range(sps_prevalence$prevalence)  # 5.208127e-05, 7.925767e-03   (6 sp)
+                                  # 5.208127e-05, 1.466028e-02   (all sp)
 
 
 
@@ -2902,7 +2928,8 @@ plot_4 <-  ggplot(dta2plot_lucas,
 plot_4
                   
 
-jpeg("LUCASval_TSS_Prevalence_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+#jpeg("LUCASval_TSS_Prevalence_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+jpeg("LUCASval_TSS_Prevalence_allThresholds_MaxEnt_RF_DS.jpg", width = 30, height = 15, units = "cm", res = 150)
 plot_4
 dev.off()
 
@@ -2915,20 +2942,22 @@ dta2plot_6 <- merge(dta2plot_2, sps_prevalence, by = "species", all.x = TRUE)
 
 plot5 <- ggplot(dta2plot_5, aes(prevalence, GBIF_AUC.val, colour = factor(algorithm))) +
   geom_point() +
-  geom_smooth(method = lm, se = FALSE) 
-  #ggpmisc::stat_poly_line(se = FALSE) +
-  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
-  #  after_stat(rr.label),
-  #  after_stat(p.value.label), sep = "*\", \"*"))) 
+  #geom_smooth(method = lm, se = FALSE) 
+  ggpmisc::stat_poly_line(se = FALSE) +
+  ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+    after_stat(rr.label),
+    after_stat(p.value.label), sep = "*\", \"*")),
+    label.y = "top", label.x = "right") 
   
 
 plot51 <- ggplot(dta2plot_5, aes(prevalence, LUCAS_AUC.val, colour = factor(algorithm))) +
   geom_point() +
-  geom_smooth(method = lm, se = FALSE) 
-  #ggpmisc::stat_poly_line(se = FALSE) +
-  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
-  #  after_stat(rr.label),
-  #  after_stat(p.value.label), sep = "*\", \"*"))) 
+  #geom_smooth(method = lm, se = FALSE) 
+  ggpmisc::stat_poly_line(se = FALSE) +
+  ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+    after_stat(rr.label),
+    after_stat(p.value.label), sep = "*\", \"*")),
+    label.y = "top", label.x = "right") 
   
 grid.arrange(plot5, plot51, ncol = 2)
 
@@ -2936,27 +2965,30 @@ grid.arrange(plot5, plot51, ncol = 2)
 
 plot6 <- ggplot(dta2plot_6, aes(prevalence, GBIF_cbi.val, colour = factor(algorithm))) +
   geom_point() +
-  geom_smooth(method = lm, se = FALSE) 
-  #ggpmisc::stat_poly_line(se = FALSE) +
-  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
-  #  after_stat(rr.label),
-  #  after_stat(p.value.label), sep = "*\", \"*"))) 
+  #geom_smooth(method = lm, se = FALSE) 
+  ggpmisc::stat_poly_line(se = FALSE) +
+  ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+    after_stat(rr.label),
+    after_stat(p.value.label), sep = "*\", \"*")),
+    label.y = "bottom", label.x = "right") 
   
 
 plot61 <- ggplot(dta2plot_6, aes(prevalence, LUCAS_CBI.val, colour = factor(algorithm))) +
   geom_point() +
-  geom_smooth(method = lm, se = FALSE) 
-  #ggpmisc::stat_poly_line(se = FALSE) +
-  #ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
-  #  after_stat(rr.label),
-  #  after_stat(p.value.label), sep = "*\", \"*")))
+  #geom_smooth(method = lm, se = FALSE) 
+  ggpmisc::stat_poly_line(se = FALSE) +
+  ggpmisc::stat_poly_eq(aes(label = paste(#after_stat(eq.label),
+    after_stat(rr.label),
+    after_stat(p.value.label), sep = "*\", \"*")),
+    label.y = "top", label.x = "right")
   
 
 grid.arrange(plot6, plot61, ncol = 2)
 
 
 
-jpeg("LUCASval_prevalence_AUC_CBI_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 30, units = "cm", res = 150)
+#jpeg("LUCASval_prevalence_AUC_CBI_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 30, units = "cm", res = 150)
+jpeg("LUCASval_prevalence_AUC_CBI_MaxEnt_RF_DS.jpg", width = 30, height = 30, units = "cm", res = 150)
 grid.arrange(plot5, plot51, plot6, plot61, ncol = 2)
 dev.off()
 
@@ -2977,13 +3009,17 @@ if(run_this == "yes"){
   info_models_RF_DS_ReleveValid_1[, TypeII := (1 - TruePositiveRate)]
   
   info_models_RF_DS_ReleveValid <- info_models_RF_DS_ReleveValid_1
-  
-  
-  info_models_maxent_ReleveValid[, TypeI := (1 - TrueNegativeRate)]
-  info_models_maxent_ReleveValid[, TypeII := (1 - TruePositiveRate)]
 
 }
 
+
+run_this <- "no"
+if(run_this == "yes"){
+  
+  info_models_maxent_ReleveValid[, TypeI := (1 - TrueNegativeRate)]
+  info_models_maxent_ReleveValid[, TypeII := (1 - TruePositiveRate)]
+  
+}
 
 
 info_models_RF_DS_ReleveValid
@@ -3087,7 +3123,8 @@ plot_8 <- ggplot(dta2plot_lucas_1, aes(x = Statistic, y = value, color = algorit
 
 plot_8
 
-jpeg("LUCASval_TSS_TypeI_TypeII_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+#jpeg("LUCASval_TSS_TypeI_TypeII_allThresholds_MaxEnt_RF_DS_6sps.jpg", width = 30, height = 15, units = "cm", res = 150)
+jpeg("LUCASval_TSS_TypeI_TypeII_allThresholds_MaxEnt_RF_DS.jpg", width = 30, height = 15, units = "cm", res = 150)
 plot_8
 dev.off()
 
@@ -3108,6 +3145,17 @@ dta2plot_lucas_1 %>%
 #    LUCAS_TypeI       RF_DS   42   0.229   0.286
 #   LUCAS_TypeII      MaxEnt   42   0.571   0.485
 #   LUCAS_TypeII       RF_DS   42   0.730   0.443
+
+
+#      Statistic   algorithm    n    mean      SD
+#      LUCAS_TSS      MaxEnt  434   0.032   0.130
+#      LUCAS_TSS       RF_DS  434   0.035   0.114
+#    LUCAS_TypeI      MaxEnt  434   0.339   0.314
+#    LUCAS_TypeI       RF_DS  434   0.262   0.293
+#   LUCAS_TypeII      MaxEnt  434   0.707   0.452
+#   LUCAS_TypeII       RF_DS  434   0.796   0.399
+
+
 
 
 
