@@ -439,7 +439,7 @@ species_list_releve
 
 write.csv(species_list_releve, "species_list_releve.csv", row.names = FALSE, quote = FALSE)
 species_list_releve <- fread("species_list_releve.csv", sep = ",")
-
+species_list_releve
 
 
 #apply(releve_point_data, 1, function(x) sum(!is.na(x)))
@@ -2146,6 +2146,196 @@ max(data2save_ReleveValid$Kappa)
 
 data2save_ReleveValid[TSS >= 0.5]
 data2save_ReleveValid[Kappa >= 0.4]
+
+
+
+
+
+
+
+## IUCN Red List status ####
+
+species_list_releve <- fread("species_list_releve.csv", sep = ",")
+species_list_releve
+
+
+iucn_redlist <- read.csv(unz("redlist_species_data_1caf1de4-881a-4ec3-b01b-5b14c39078c4.zip", 
+                             "assessments.csv"), 
+                         header = TRUE, sep = ",") %>% data.table
+iucn_redlist
+names(iucn_redlist)
+
+iucn_redlist_1 <- iucn_redlist[, .SD, .SDcols = c("scientificName", "redlistCategory", "redlistCriteria")]
+iucn_redlist_1
+
+length(unique(iucn_redlist_1$scientificName))  # 62666 unique species in the list
+
+sum(is.na(iucn_redlist_1$redlistCategory))
+sum(is.na(iucn_redlist_1$redlistCriteria))
+
+unique(iucn_redlist_1$redlistCategory)
+# "Endangered"                        "Critically Endangered"             "Least Concern"                     "Near Threatened"                  
+# "Vulnerable"                        "Data Deficient"                    "Extinct in the Wild"               "Extinct"                          
+# "Lower Risk/near threatened"        "Lower Risk/conservation dependent" "Lower Risk/least concern"         
+
+unique(iucn_redlist_1$redlistCriteria)
+
+
+
+species_list_releve_iucn <- merge(species_list_releve, iucn_redlist_1, by.x = "species_list_releve", by.y = "scientificName", all.x = TRUE) 
+species_list_releve_iucn
+
+sum(is.na(species_list_releve_iucn$redlistCategory))  # 2336
+sum(!is.na(species_list_releve_iucn$redlistCategory)) #  336
+
+table(species_list_releve_iucn$redlistCategory)
+#  Data Deficient    Least Concern     Near Threatened      Vulnerable 
+#              10              322                   3               1 
+
+
+
+"Ziziphora capitata"
+iucn_redlist_1[grepl("Ziziphora", scientificName), ]
+
+species_list_releve_iucn[is.na(redlistCategory), species_list_releve]
+head(species_list_releve_iucn[is.na(redlistCategory), species_list_releve], 20)
+
+
+
+species_list_releve_1 <- species_list_releve 
+
+species_list_releve_1
+
+head(species_list_releve_1$species_list_releve, 20)
+head(gsub(" subsp.*","", species_list_releve_1$species_list_releve), 20)
+
+species_list_releve_1$species_list_releve <- gsub(" subsp.*","", species_list_releve_1$species_list_releve)
+
+
+species_list_releve_iucn_1 <- merge(species_list_releve_1, iucn_redlist_1, by.x = "species_list_releve", by.y = "scientificName", all.x = TRUE) 
+species_list_releve_iucn_1
+
+sum(is.na(species_list_releve_iucn_1$redlistCategory))  # 2293
+sum(!is.na(species_list_releve_iucn_1$redlistCategory)) #  379
+
+
+table(species_list_releve_iucn_1$redlistCategory)
+#  Data Deficient    Least Concern     Near Threatened      Vulnerable 
+#              10              365                   3               1 
+
+species_list_releve_iucn_1[redlistCategory == "Near Threatened", species_list_releve]
+#  "Elatine alsinastrum" "Fraxinus excelsior"  "Mentha cervina"
+
+species_list_releve_iucn_1[redlistCategory == "Vulnerable", species_list_releve]
+#   "Aesculus hippocastanum"
+
+
+View(species_list_releve_iucn_1)
+
+
+
+
+
+## Pl@ntNet "curated list" 
+# They removed genera and all info regarding subspecies
+
+library(readxl)
+
+plantnet_curated <- read_excel("PlantNet/JRC_species_list_releve_PN20230313.v2.xlsx", sheet = "Curated_species_list") %>%
+  data.table()
+
+plantnet_curated  # 2263 species
+names(plantnet_curated) <- gsub(" ", "_", names(plantnet_curated))
+
+
+species_list_releve_iucn_2 <- merge(plantnet_curated, iucn_redlist_1, by.x = "Species_names", by.y = "scientificName", all.x = TRUE) 
+species_list_releve_iucn_2
+
+sum(is.na(species_list_releve_iucn_2$redlistCategory))  # 1916
+sum(!is.na(species_list_releve_iucn_2$redlistCategory)) #  347  # We are missing matches
+
+table(species_list_releve_iucn_2$redlistCategory)
+#  Data Deficient   Least Concern    Near Threatened      Vulnerable 
+#              11             332                  3               1 
+
+species_list_releve_iucn_2[redlistCategory == "Near Threatened", Species_names]
+#  "Elatine alsinastrum" "Fraxinus excelsior"  "Mentha cervina"
+
+species_list_releve_iucn_2[redlistCategory == "Vulnerable", Species_names]
+#   "Aesculus hippocastanum"
+
+
+
+
+## Plots
+
+library(ggplot2)
+library(dplyr)
+library(viridis)
+
+
+species_list_releve_iucn_1
+
+species_list_releve_iucn_11 <- species_list_releve_iucn_1 %>%
+  group_by(redlistCategory) %>%
+  summarise(n = n()) %>%
+  mutate(redlistCategory = replace_na(redlistCategory, "NoData")) %>%
+  data.table()
+  
+species_list_releve_iucn_11
+
+species_list_releve_iucn_11$redlistCategory <- factor(species_list_releve_iucn_11$redlistCategory,
+                                                      levels = c("NoData", "Data Deficient", "Least Concern", "Near Threatened", "Vulnerable"))
+
+
+bp <- ggplot(species_list_releve_iucn_11, 
+             aes(x = redlistCategory, y = n, fill = redlistCategory)) +
+  geom_bar(width = 1, stat = "identity") +
+  geom_text(aes(label = n), vjust = -0.2, size = 5) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12, vjust = 10),
+        axis.text.y = element_text(size = 12),
+        axis.title.x = element_text(size = 14, vjust = 6),
+        axis.title.y = element_text(size = 14),
+        legend.title = element_text(size = 14), 
+        legend.text = element_text(size = 12)) + 
+  scale_fill_viridis(option = "viridis", discrete = TRUE) +
+  annotate("text", x = 4, y = 2000, 
+           size = 10,
+           label = paste0("Total species = ", sum(species_list_releve_iucn_11$n))) +
+  annotate("text", x = 5, y = 100, 
+           size = 5,
+           label = paste0(species_list_releve_iucn_1[redlistCategory == "Vulnerable", species_list_releve]),
+           fontface = "italic") +
+  annotate("text", x = 4, y = 250, 
+           size = 5,
+           label = paste(species_list_releve_iucn_1[redlistCategory == "Near Threatened", species_list_releve], collapse = "\n"),
+           fontface = "italic") 
+
+bp
+
+jpeg("ReleveSps_IUCNRedList.jpg", width = 35, height = 25, units = "cm", res = 300)
+bp
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
