@@ -589,6 +589,7 @@ cor(releve_point_SpRichness_valid[, c(2, 6)], method = c("spearman"))  # 0.78
 
 #
 
+write.csv(releve_point_SpRichness_valid, "releve_point_SpRichness_valid.csv", row.names = FALSE)
 
 
 

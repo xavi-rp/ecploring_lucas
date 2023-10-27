@@ -20,7 +20,7 @@ if(Sys.info()[4] == "D01RI1700308") {
   wd <- "D:/xavi_rp/D5_FFGRCC_lucas_grasslands/"
 }else if(Sys.info()[4] == "S-JRCIPRAP320P") {
   wd <- "D:/rotllxa/D5_FFGRCC_lucas_grasslands/"
-}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12" )) {
+}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12", "jeodpp-terminal-jd002-03" )) {
   if(!dir.exists("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")) 
     dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")
   wd <- "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/"
@@ -38,15 +38,33 @@ setwd(wd)
 ## Lucas grassland 2018 data set ####
 
 ## Harmonized by Momo
-dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/flowerpower/data/LUCAS_grassland_data/scrap_output/estat_version_2/"
+#dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/flowerpower/data/LUCAS_grassland_data/scrap_output/estat_version_2/"
+dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/"  # this is the final repo with the curated data sets and other info
 list.files(dir_LucasGrassland_Momo)
 
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/")
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/")
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/")
+
+
+
+
+data <- st_read("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs/estatdb_allattr_s_point.gpkg")
+
+data
+names(data)
+
+sort(unique(data$POINT_GRASS_REGION))
+sort(unique(data$POINT_GRASS_REGION_NAME))
+
+
+
+
+
 # Point geometries with all LUCAS Grassland attributes minus releve - 
-point_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/estat_s_attr_point_allattr_new.csv")
-# Line geometries with all LUCAS Grassland attributes minus releve - 
-line_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/estatdb_allattr_s_transects.kml")
+point_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/data/LUCAS_G_2018_KEYSPECIES/CSVs/estat_s_attr_point_allattr_new.csv")
 # Expert point geometries all LUCAS Grassland attributes minus releve - 
-point_geom_experts <- paste0(dir_LucasGrassland_Momo, "/estat_e_attr_point_allattr_new.csv")
+point_geom_experts <- paste0(dir_LucasGrassland_Momo, "/data/LUCAS_G_2018_KEYSPECIES/CSVs/estat_e_attr_point_allattr_new.csv")
 
 
 ## Surveyors data set (points)
@@ -54,7 +72,7 @@ point_geom_surveyors <- fread(point_geom_surveyors)
 point_geom_surveyors
 
 nrow(point_geom_surveyors)  # 2622
-ncol(point_geom_surveyors)  #  127
+ncol(point_geom_surveyors)  #  126
 names(point_geom_surveyors)
 
 
@@ -78,6 +96,42 @@ summary(point_geom_surveyors$NUMBER_FLOWERS_KEY_SPECIES)
 #   0.00    4.00    16.00    22.95   33.00   131.00
 
 sort(unique(point_geom_surveyors$SURVEY_GRASS_FLOWER_DENSITY)) # 1-10; do not know what this is
+
+
+
+length(table(point_geom_surveyors$NUTS0)) # 26 countries
+table(point_geom_surveyors$NUTS0) 
+#  AT  BE  BG  CY  CZ  DE  DK  EE  EL  ES  FI  FR  HR  HU  IE  IT  LT  LV  NL  PL  PT  RO  SE  SI  SK  UK 
+#  55  10 159  43  26  83  29   8 256 383  14 320  35  79  23 133  17  16   7 157 153 405  85  30  23  73 
+
+
+
+sort(unique(point_geom_surveyors$POINT_GRASS_REGION))  # 1:10   # biogeographical region
+table(point_geom_surveyors$POINT_GRASS_REGION) 
+#  1   2   3   4   5   6   7   8   9  10 
+# 96 169 234 437 572 160 106 384 165 299 
+
+
+sort(unique(point_geom_surveyors$POINT_GRASS_REGION_NAME))  #  # biogeographical region names
+table(point_geom_surveyors$POINT_GRASS_REGION_NAME) 
+#  Atlantic - Northwest        Atlantic - South + East            Boreal + Baltic Sea 
+#       96                            234                            169 
+#  Continental - East            Continental - North            Continental - South 
+#      384                            437                            160 
+#  Mediterranean - East Mediterranean - West + Central                      Pannonian 
+#      299                            572                            106 
+#  Steppic + Black Sea region 
+#      165  
+
+
+
+#
+
+
+names(point_geom_surveyors)
+
+
+
 
 
 ## Plotting the points (surveyors) ####
@@ -104,21 +158,22 @@ eur_gisco
 eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 32, ymin = 33, ymax = 70)
 
 p <- ggplot() +
-  geom_sf(data = eur_gisco) +
+  geom_sf(data = eur_gisco, fill = "grey77") +
   geom_point(
     data = point_geom_surveyors, 
-    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT),
+    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT, color = factor(POINT_GRASS_REGION_NAME)),
     size = 0.1,
-    color = "darkred"
-  ) +
-  
+    #color = "darkred",
+    show.legend = FALSE
+    ) +
   theme_light() +
-  #scale_color_viridis(option = "viridis", discrete = TRUE) +
+  scale_color_viridis(option = "viridis", discrete = TRUE, direction = -1) +
   labs(title = "LUCAS grasslands 2018 (surveyors)") + #, x = "TY [°C]", y = "Txxx") +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "bottom",
-        legend.title = element_text(size = 16))# +
-  #guides(color = guide_legend("Species", override.aes = list(size = 2)))
+        legend.title = element_text(size = 16)
+        ) #+
+  #guides(fill = guide_legend(title = "Biogeographical Regions"))
 
 # https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
 p1 <- ggMarginal(p,
@@ -126,7 +181,7 @@ p1 <- ggMarginal(p,
                  #type = "density", 
                  type = "histogram", 
                  #type = "densigram", 
-                 color = "darkred",
+                 #color = "darkred",
                  groupColour = FALSE, groupFill = FALSE)
 p1
 
@@ -154,7 +209,7 @@ sort(unique(point_geom_surveyors$sp_richness_class))
 point_geom_surveyors$NUMBER_KEY_SPECIES <- as.factor(point_geom_surveyors$NUMBER_KEY_SPECIES)
 
 
-p <- ggplot() +
+p_richness <- ggplot() +
   geom_sf(data = eur_gisco) +
   geom_point(
     data = point_geom_surveyors, 
@@ -173,16 +228,16 @@ p <- ggplot() +
   guides(color = guide_legend("Key species richness classes", override.aes = list(size = 2)))
 
 # https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
-p1 <- ggMarginal(p,
-                 aes(colour = sp_richness_class),
-                 type = "density", 
-                 #type = "histogram", 
-                 #type = "densigram", 
-                 #color = "darkred",
-                 groupColour = TRUE, groupFill = TRUE)
-p1
+p1_richness <- ggMarginal(p_richness,
+                          aes(colour = sp_richness_class),
+                          type = "density", 
+                          #type = "histogram", 
+                          #type = "densigram", 
+                          #color = "darkred",
+                          groupColour = TRUE, groupFill = TRUE)
+p1_richness
 
-ggsave("point_geom_surveyors_SpRichness.png", p1)#, width = 20, height = 20, units = "cm")
+ggsave("point_geom_surveyors_SpRichness.png", p1_richness)#, width = 20, height = 20, units = "cm")
 
 
 
@@ -198,8 +253,7 @@ ggsave("point_geom_surveyors_SpRichness.png", p1)#, width = 20, height = 20, uni
 
 ## Experts; normal survey ####
 
-point_geom_experts #<- paste0(dir_LucasGrassland_Momo, "/estat_e_attr_point_allattr.csv")
-
+point_geom_experts
 
 ## Experts data set (points)
 point_geom_experts <- fread(point_geom_experts)
@@ -207,7 +261,8 @@ point_geom_experts <- fread(point_geom_experts)
 point_geom_experts
 
 nrow(point_geom_experts)   # 605
-names(point_geom_experts)  # 124+2
+names(point_geom_experts)  # 126
+
 
 # EUNIS habitat classification
 sort(unique(point_geom_experts$SURVEY_GRASS_EUNIS_HABITAT))
@@ -219,7 +274,20 @@ table(point_geom_experts$SURVEY_GRASS_RICHNESS_SPEC27)
 sort(unique(point_geom_experts$NUMBER_KEY_SPECIES)) # 0-17; this should be species richness in the point
 summary(point_geom_experts$NUMBER_FLOWERS_KEY_SPECIES) 
 #    Min. 1st Qu.  Median    Mean   3rd Qu.    Max. 
-#   0.00  17.00    37.50    41.31   59.00  155.00
+#   0.00   16.00    40.00   42.69     63.00  155.00
+
+
+table(point_geom_experts$POINT_GRASS_REGION_NAME)
+#  Atlantic - Northwest        Atlantic - South + East            Boreal + Baltic Sea 
+#  16                             53                             55 
+#  Continental - East            Continental - North            Continental - South 
+#  105                             95                             41 
+#  Mediterranean - East Mediterranean - West + Central                      Pannonian 
+#  102                             88                             20 
+#  Steppic + Black Sea region 
+#  30 
+
+
 
 
 ## Plotting Experts points
@@ -231,34 +299,60 @@ eur_gisco
 
 eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 40, ymin = 33, ymax = 70)
 
-p <- ggplot() +
-  geom_sf(data = eur_gisco) +
+p_experts <- ggplot() +
+  geom_sf(data = eur_gisco, fill = "grey77") +
   geom_point(
     data = point_geom_experts, 
-    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT),
+    aes(x = SURVEY_GRASS_GPS_LON, y = SURVEY_GRASS_GPS_LAT, color = factor(POINT_GRASS_REGION_NAME)),
     size = 0.1,
-    color = "darkblue"
+    #color = "darkblue",
+    show.legend = TRUE
   ) +
-  
   theme_light() +
-  #scale_color_viridis(option = "viridis", discrete = TRUE) +
+  scale_color_viridis(option = "viridis", discrete = TRUE, direction = -1) +
   labs(title = "LUCAS grasslands 2018 (experts)") + #, x = "TY [°C]", y = "Txxx") +
   theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "bottom",
-        legend.title = element_text(size = 16))# +
-#guides(color = guide_legend("Species", override.aes = list(size = 2)))
+        legend.position = "right",
+        legend.title = element_text(size = 12)
+        ) +
+guides(color = guide_legend(title = "Biogeographical Regions",
+                            override.aes = list(size = 5),
+                            title.position = "top",
+                            title.hjust = 0.5))
+
 
 # https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
-p1 <- ggMarginal(p,
+p_experts1 <- ggMarginal(p_experts,
                  #aes(colour = species),
                  #type = "density", 
                  type = "histogram", 
                  #type = "densigram", 
-                 color = "darkblue",
+                 #color = "darkblue",
                  groupColour = FALSE, groupFill = FALSE)
-p1
+p_experts1
 
-ggsave("point_geom_experts.png", p1, width = 20, height = 20, units = "cm")
+ggsave("point_geom_experts.png", p_experts1, width = 20, height = 20, units = "cm")
+
+
+
+
+library(ggpubr)
+png("surveyors_experts_points.png", width = 25, height = 20, res = 300, units = "cm")
+
+ggarrange(p, p_experts, ncol=2, nrow = 1, 
+          common.legend = TRUE, legend = "bottom",
+          font.label = list(size = 14))
+dev.off()
+
+#
+
+
+
+
+
+
+
+
 
 
 
@@ -278,7 +372,7 @@ sort(unique(point_geom_experts$sp_richness_class))
 point_geom_experts$NUMBER_KEY_SPECIES <- as.factor(point_geom_experts$NUMBER_KEY_SPECIES)
 
 
-p <- ggplot() +
+p_richness_2 <- ggplot() +
   geom_sf(data = eur_gisco) +
   geom_point(
     data = point_geom_experts, 
@@ -297,16 +391,16 @@ p <- ggplot() +
   guides(color = guide_legend("Key species richness classes", override.aes = list(size = 2)))
 
 # https://jtr13.github.io/cc21fall2/tutorial-for-scatter-plot-with-marginal-distribution.html
-p1 <- ggMarginal(p,
+p1_richness_2 <- ggMarginal(p_richness_2,
                  aes(colour = sp_richness_class),
                  type = "density", 
                  #type = "histogram", 
                  #type = "densigram", 
                  #color = "darkred",
                  groupColour = TRUE, groupFill = TRUE)
-p1
+p1_richness_2
 
-ggsave("point_geom_experts_SpRichness.png", p1, width = 20, height = 20, units = "cm")
+ggsave("point_geom_experts_SpRichness.png", p1_richness_2, width = 20, height = 20, units = "cm")
 
 
 
@@ -588,6 +682,8 @@ cor(releve_point_SpRichness_valid[, c(2, 6)], method = c("spearman"))  # 0.78
 
 
 #
+
+write.csv(releve_point_SpRichness_valid, "releve_point_SpRichness_valid.csv", row.names = FALSE)
 
 
 
@@ -2322,20 +2418,116 @@ dev.off()
 
 
 
+## comparing date of the survey ####
+
+
+point_geom_surveyors
+point_geom_experts
+
+names(point_geom_experts)
+
+
+point_geom_surveyors_date <- point_geom_surveyors[, c("POINT_ID", "SURVEY_DATE")]
+head(point_geom_surveyors_date)
+nrow(point_geom_surveyors_date)
+
+point_geom_experts_date <- point_geom_experts[, c("POINT_ID", "SURVEY_DATE")]
+head(point_geom_experts_date)
+nrow(point_geom_experts_date)
+
+
+sum(point_geom_surveyors_date$POINT_ID %in% point_geom_experts_date$POINT_ID)
+sum(point_geom_experts_date$POINT_ID %in% point_geom_surveyors_date$POINT_ID)  # 526 points in both (out of 605 expert points)
+                                                                               # probably due to data cleaning
 
 
 
 
+s_e_date <- merge(point_geom_surveyors_date, point_geom_experts_date, 
+                  by = "POINT_ID", all.y = TRUE)
+
+head(s_e_date)
+nrow(s_e_date)
+sum(is.na(s_e_date$SURVEY_DATE.x))
+605 - 79
+
+s_e_date <- na.omit(s_e_date)
+nrow(s_e_date)
+head(s_e_date)
+
+names(s_e_date) <- gsub(".x", "_s", names(s_e_date))
+names(s_e_date) <- gsub(".y", "_e", names(s_e_date))
+
+
+s_e_date$SURVEY_DATE_s <- as.Date(s_e_date$SURVEY_DATE_s, format = "%m/%d/%Y")
+s_e_date$SURVEY_DATE_e <- as.Date(s_e_date$SURVEY_DATE_e, format = "%m/%d/%Y")
+
+
+s_e_date$date_diff <- as.numeric(difftime(s_e_date$SURVEY_DATE_s, s_e_date$SURVEY_DATE_e, units = "days"))
+head(s_e_date)
+
+s_e_date$date_diff_fact <- as.factor(abs(s_e_date$date_diff))
+head(s_e_date)
+
+summary(s_e_date$date_diff)
+
+
+# some checks
+s_e_date[s_e_date$date_diff_fact == 74, ]
+s_e_date[s_e_date$date_diff_fact == 23, ]
+s_e_date[s_e_date$date_diff_fact == 0, ]
+s_e_date[s_e_date$date_diff_fact == 139, ]
 
 
 
+s_e_date_freq <- as.data.frame(table(s_e_date$date_diff))
+head(s_e_date_freq)
+  
+
+
+# BarPlot with differences between surveys date
+
+ggplot(s_e_date_freq, aes(x = Var1, y = Freq)) +
+  geom_bar(position = 'identity', stat = "identity")
+
+
+str(s_e_date_freq$Var1)
+
+s_e_date_freq$date_diff_fact <- as.factor(abs(as.numeric(as.character(s_e_date_freq$Var1))))
+head(s_e_date_freq)
+
+s_e_date_freq[s_e_date_freq$date_diff_fact == 0, ]  # 10 points visited the same day
+s_e_date_freq_SameDay <- s_e_date_freq[s_e_date_freq$date_diff_fact == 0, "Freq"] 
+
+
+s_e_date_freq[s_e_date_freq$date_diff_fact == 0, ] <- NA
+
+
+s_e_date_freq$Var1 <- as.numeric(as.character(s_e_date_freq$Var1))
+
+s_e_date_freq$sign_freq <- s_e_date_freq$Freq * ifelse(s_e_date_freq$Var1 > 0, 1, -1)
+
+s_e_date_freq$pos_neg <- ifelse(s_e_date_freq$Var1 > 0, "ExpertFirst", "SurveyorFirst")
+
+head(s_e_date_freq)
+
+
+p_dif <- ggplot(s_e_date_freq, aes(#x = Var1, 
+                          x = date_diff_fact,
+                          y = sign_freq,
+                          fill = pos_neg)) +
+  geom_bar(position = 'identity', stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ggtitle("") +
+  xlab("Days of difference") + ylab("Number of points") + 
+  scale_fill_discrete(name = "", labels = c("Experts First", "Surveyors First" , paste0("Same Day (n = ", s_e_date_freq_SameDay, ")"))) 
+
+
+png("surveyors_experts_diff_date.png", width = 25, height = 15, res = 300, units = "cm")
+p_dif
+dev.off()
 
 
 
-
-
-
-
-
-
+## scatter richness error (surveyor vs expert) against date difference 
 
