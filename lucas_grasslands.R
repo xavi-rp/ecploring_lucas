@@ -2588,3 +2588,78 @@ dev.off()
 
 ## scatter richness error (surveyor vs expert) against date difference 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Making copies of the final data sets to my EOS ####
+
+# final repo (key species - CSVs)
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/")
+
+
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/")
+
+# final repo (key species - GPKGs)
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs")
+
+
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/")
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_EXIF")
+
+
+# final repo (releve - CSVs)
+if(!dir.exists("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/"))
+  dir.create("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/")
+
+if(!dir.exists("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/"))
+  dir.create("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/")
+
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/")
+
+
+
+
+# make copy to my eos
+
+list.files("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data")
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/")
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_RELEVE")
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_RELEVE/CSVs/")
+file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/", 
+          to = "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_RELEVE/", 
+          recursive = TRUE)
+
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/")
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/CSVs/")
+file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/", 
+          to = "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/", 
+          recursive = TRUE)
+
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/GPKGs/")
+file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs", 
+          to = "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/", 
+          recursive = TRUE)
+
+
+
+
+
+
+
+
+
+
