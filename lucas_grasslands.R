@@ -441,7 +441,7 @@ estatdb_allattr_th
 
 
 
-#
+## This is the good original data
 dir_LucasGrassland_2 <- "/eos/jeodpp/data/projects/REFOCUS/data/flowerpower/data/LUCAS_grassland_data/databases/"
 list.files(dir_LucasGrassland_2)
 
@@ -478,6 +478,8 @@ tail(colnames(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point))
 table(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point$`number of points present`)
 DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point$`number of points present` == 138, 1:4]
 
+View(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[1:5, ])
+
 ## remove empty row
 if(sum(is.na(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[3, ])) == ncol(DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point)) 
   releve_point <- DLV5_lot9_surveydatabase_LUCAS2018_v3_releve_point[-3, ]
@@ -488,6 +490,8 @@ releve_point
 head(names(releve_point))
 head((releve_point))
 releve_point[2, 1]
+
+View(releve_point[1:5, ])
 
 releve_point_data <- releve_point[3:nrow(releve_point), 4:ncol(releve_point)] # keeping only plants occurrences/abundances 
 releve_point_data[, 1:4]
@@ -697,6 +701,59 @@ cor(releve_point_SpRichness_valid[, c(2, 6)], method = c("spearman"))  # 0.78
 write.csv(releve_point_SpRichness_valid, "releve_point_SpRichness_valid.csv", row.names = FALSE)
 
 
+
+### Releve data to publish ####
+
+releve_point
+nrow(releve_point)      # 2674
+View(releve_point[1:5, ])
+unique(releve_point[, 2])  # NA sp sub
+table(releve_point[, 2])
+#  sp sub 
+# 152 289 
+
+View(releve_point[releve_point$`type (sub = subspecies, sp = only identified to genus level)` %in% "sp", ])
+
+
+colnames(releve_point)[1:5]
+tail(colnames(releve_point))
+
+
+
+releve_data <- releve_point[3:nrow(releve_point), !colnames(releve_point) %in% c("number of points present")] # keeping only plants occurrences/abundances 
+
+colnames(releve_data)[1:5]
+View(releve_data[1:5, ])
+
+names(releve_data) <- gsub("\\.\\.\\.1", "Species", names(releve_data))
+View(releve_data[1:5, ])
+
+
+write.csv(releve_data, 
+          paste0("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/",
+                 "releve_data_all.csv"),
+          row.names = FALSE)
+
+releve_data_kk <- fread(paste0("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/",
+                            "releve_data_all.csv"),
+                        header = TRUE)
+releve_data_kk
+View(releve_data_kk[1:5, ])
+unique(releve_data_kk$`type (sub = subspecies, sp = only identified to genus level)`)
+table(releve_data_kk$`type (sub = subspecies, sp = only identified to genus level)`)
+
+nrow(releve_data)
+ncol(releve_data)
+nrow(releve_data_kk)
+ncol(releve_data_kk)
+
+unique(releve_data_kk$`26521776`)  # need to understand what 0.1, 0.2, 1.75, etc mean
+
+all_vals <- c()
+for(i in 3:ncol(releve_data_kk)){
+  all_vals <- c(all_vals, unique(unlist(releve_data_kk[, ..i])))
+}
+unique(all_vals)
 
 
 
@@ -2544,6 +2601,7 @@ dev.off()
 
 ## scatter richness error (surveyor vs expert) against date difference 
 
+<<<<<<< HEAD
 s_e_date
 head(s_e_date)
 
@@ -2664,3 +2722,80 @@ s_e_date_1
 s_e_date_1$diff_richness_fact
 summary(s_e_date_1$diff_richness_fact)
 summary(as.numeric(as.character(s_e_date_1$date_diff_fact)))
+=======
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Making copies of the final data sets to my EOS ####
+
+# final repo (key species - CSVs)
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/")
+
+
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/")
+
+# final repo (key species - GPKGs)
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs")
+
+
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/")
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_EXIF")
+
+
+# final repo (releve - CSVs)
+if(!dir.exists("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/"))
+  dir.create("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/")
+
+if(!dir.exists("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/"))
+  dir.create("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/")
+
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/")
+
+
+
+
+# make copy to my eos
+
+list.files("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data")
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/")
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_RELEVE")
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_RELEVE/CSVs/")
+file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/", 
+          to = "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_RELEVE/", 
+          recursive = TRUE)
+
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/")
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/CSVs/")
+file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/", 
+          to = "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/", 
+          recursive = TRUE)
+
+
+dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/GPKGs/")
+file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs", 
+          to = "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/LUCAS_Grassland_2018_final/LUCAS_G_2018_KEYSPECIES/", 
+          recursive = TRUE)
+
+
+
+
+
+
+
+
+
+
+>>>>>>> 28315b09a45e60c9486e3be5ffd80928b2520886
