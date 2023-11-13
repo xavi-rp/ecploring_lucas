@@ -7,7 +7,8 @@ library(data.table)
 #               ref = "v2", 
 #               INSTALL_opts = c("--no-multiarch"))  # https://github.com/rstudio/renv/issues/162
 #library(PreSPickR)
-library(raster)
+#library(raster)
+library(terra)
 library(giscoR)
 library(sf)
 library(tidyverse)
@@ -25,6 +26,10 @@ if(Sys.info()[4] == "D01RI1700308") {
     dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")
   wd <- "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/"
   gbif_creds <- "/home/rotllxa/Documents/"
+  WhereAmI <- "bdap"
+}else if(Sys.info()[4] == "MacBook-MacBook-Pro-de-Xavier.local"){
+  wd <- "/Users/xavi_rp/Documents/D5_FFGRCC/lucas_grasslands_data/"
+  WhereAmI <- "mac"
 }else{
   wd <- "C:/Users/rotllxa/D5_FFGRCC_lucas_grasslands/"
   gbif_creds <- "C:/Users/rotllxa/Documents/"
@@ -38,33 +43,39 @@ setwd(wd)
 ## Lucas grassland 2018 data set ####
 
 ## Harmonized by Momo
-#dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/flowerpower/data/LUCAS_grassland_data/scrap_output/estat_version_2/"
-dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/"  # this is the final repo with the curated data sets and other info
-list.files(dir_LucasGrassland_Momo)
 
-list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/")
-list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/")
-list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/")
-
-
-
-
-data <- st_read("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs/estatdb_allattr_s_point.gpkg")
-
-data
-names(data)
-
-sort(unique(data$POINT_GRASS_REGION))
-sort(unique(data$POINT_GRASS_REGION_NAME))
-
+if(WhereAmI == "bdap"){
+  #dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/flowerpower/data/LUCAS_grassland_data/scrap_output/estat_version_2/"
+  dir_LucasGrassland_Momo <- "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/"  # this is the final repo with the curated data sets and other info
+  
+  list.files(dir_LucasGrassland_Momo)
+  
+  list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/")
+  list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/")
+  list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/")
+  
+  
+  
+  
+  data <- st_read("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs/estatdb_allattr_s_point.gpkg")
+  
+  data
+  names(data)
+  
+  sort(unique(data$POINT_GRASS_REGION))
+  sort(unique(data$POINT_GRASS_REGION_NAME))
+  
+}else if(WhereAmI == "mac"){
+  dir_LucasGrassland_Momo <- "/Users/xavi_rp/Documents/D5_FFGRCC/lucas_grasslands_data/data_2018_clean/"
+}
 
 
 
 
 # Point geometries with all LUCAS Grassland attributes minus releve - 
-point_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/data/LUCAS_G_2018_KEYSPECIES/CSVs/estat_s_attr_point_allattr_new.csv")
+point_geom_surveyors <- paste0(dir_LucasGrassland_Momo, "/LUCAS_G_2018_KEYSPECIES/CSVs/estat_s_attr_point_allattr_new.csv")
 # Expert point geometries all LUCAS Grassland attributes minus releve - 
-point_geom_experts <- paste0(dir_LucasGrassland_Momo, "/data/LUCAS_G_2018_KEYSPECIES/CSVs/estat_e_attr_point_allattr_new.csv")
+point_geom_experts <- paste0(dir_LucasGrassland_Momo, "/LUCAS_G_2018_KEYSPECIES/CSVs/estat_e_attr_point_allattr_new.csv")
 
 
 ## Surveyors data set (points)
@@ -2418,7 +2429,7 @@ dev.off()
 
 
 
-## comparing date of the survey ####
+## Comparing date of the survey ####
 
 
 point_geom_surveyors
@@ -2470,6 +2481,7 @@ s_e_date$date_diff_fact <- as.factor(abs(s_e_date$date_diff))
 head(s_e_date)
 
 summary(s_e_date$date_diff)
+summary(as.numeric(as.character(s_e_date$date_diff_fact)))
 
 
 # some checks
@@ -2510,6 +2522,7 @@ s_e_date_freq$sign_freq <- s_e_date_freq$Freq * ifelse(s_e_date_freq$Var1 > 0, 1
 s_e_date_freq$pos_neg <- ifelse(s_e_date_freq$Var1 > 0, "ExpertFirst", "SurveyorFirst")
 
 head(s_e_date_freq)
+unique(s_e_date_freq$pos_neg)
 
 
 p_dif <- ggplot(s_e_date_freq, aes(#x = Var1, 
@@ -2531,3 +2544,123 @@ dev.off()
 
 ## scatter richness error (surveyor vs expert) against date difference 
 
+s_e_date
+head(s_e_date)
+
+point_geom_surveyors
+point_geom_experts
+
+identical(point_geom_surveyors[, NUMBER_KEY_SPECIES], apply(point_geom_surveyors[, .SD, .SDcol = grepl("SURVEY_GRASS_RICHNESS", names(point_geom_surveyors))], 1, function(x) sum(x != 0, na.rm =T)))
+
+s_e_date_1 <- merge(s_e_date, point_geom_surveyors[, .SD, .SDcol = c("POINT_ID", "NUMBER_KEY_SPECIES")], 
+                    by = "POINT_ID", all.x = TRUE)
+setnames(s_e_date_1, "NUMBER_KEY_SPECIES", "NUMBER_KEY_SPECIES_s")
+
+s_e_date_1 <- merge(s_e_date_1, point_geom_experts[, .SD, .SDcol = c("POINT_ID", "NUMBER_KEY_SPECIES")], 
+                    by = "POINT_ID", all.x = TRUE)
+setnames(s_e_date_1, "NUMBER_KEY_SPECIES", "NUMBER_KEY_SPECIES_e")
+
+s_e_date_1
+
+s_e_date_1[, diff_richness := (NUMBER_KEY_SPECIES_s - NUMBER_KEY_SPECIES_e)]  # positive: surveyors overestimate
+s_e_date_1
+
+sum(s_e_date_1$diff_richness > 0)   # 56.   surveyors overestimate
+sum(s_e_date_1$diff_richness < 0)   # 382   surveyors underestimate
+sum(s_e_date_1$diff_richness == 0)  # 88 equal surveyors vs experts
+
+
+s_e_date_1$pos_neg <- ifelse(s_e_date_1$date_diff == 0, "SameDay", ifelse(s_e_date_1$date_diff > 0, "ExpertFirst", "SurveyorFirst"))
+#s_e_date_1$pos_neg <- ifelse(s_e_date_1$date_diff > 0, "ExpertFirst", "SurveyorFirst")
+s_e_date_1
+
+
+ggplot(s_e_date_1,
+       aes(x = date_diff, y = diff_richness)) + 
+  geom_point(aes(col = pos_neg)) +
+  ggpubr::stat_cor(method = "pearson", label.x = 15, label.y = 15) +
+  #geom_smooth(method = "lm")
+  #coord_fixed(ratio = 1) +
+  geom_smooth(method = "lm") +
+  theme_light() +
+  labs(title = "") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(s_e_date_1,
+       aes(x = as.numeric(as.character(date_diff_fact)), y = diff_richness)) + 
+  geom_point(aes(col = pos_neg)) +
+  ggpubr::stat_cor(method = "pearson", label.x = 15, label.y = 15) +
+  #geom_smooth(method = "lm")
+  #coord_fixed(ratio = 1) +
+  geom_smooth(method = "lm") +
+  theme_light() +
+  labs(title = "") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+# Absolute richness difference
+
+s_e_date_1[, diff_richness_fact := abs(diff_richness)]
+s_e_date_1
+
+ggplot(s_e_date_1,
+       aes(x = as.numeric(as.character(date_diff_fact)), y = diff_richness_fact)) + 
+  geom_point(aes(col = pos_neg)) +  # who goes first
+  ggpubr::stat_cor(method = "pearson", label.x = 15, label.y = 15) +
+  #geom_smooth(method = "lm")
+  #coord_fixed(ratio = 1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_light()  +
+  xlab("Days of difference") + ylab("Richness error") +
+  labs(title = "") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+#positive: surveyors overestimate
+s_e_date_1
+s_e_date_1$OverUnderEstimation <- ifelse(s_e_date_1$diff_richness == 0, "NoError", ifelse(s_e_date_1$diff_richness > 0, "SurveyorsOverestimate", "SurveyorsUnderestimate"))
+
+freq_over_under <- table(s_e_date_1$OverUnderEstimation)
+freq_over_under["NoError"]
+freq_over_under["SurveyorsOverestimate"]
+freq_over_under["SurveyorsUnderestimate"]
+
+
+p_richErr_Days <- ggplot(s_e_date_1,
+                         aes(x = as.numeric(as.character(date_diff_fact)), y = diff_richness_fact)) + 
+  geom_point(aes(col = OverUnderEstimation)) +  # over- or under-estimation
+  #ggpubr::stat_cor(method = "pearson", label.x = 15, label.y = 15) +
+  ggpubr::stat_cor(
+    aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")), 
+    label.x = 15, label.y = 15) +
+  #coord_fixed(ratio = 1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_light()  +
+  xlab("Days of difference") + ylab("Richness error |Richness Surveyors - Richness Experts|") +
+  scale_color_viridis(option = "viridis", discrete = TRUE, direction = -1,
+                      name = "", labels = c(paste0("No Error (n = ", freq_over_under["NoError"], ")"),
+                                             paste0("Surveyors Overestimate (n = ", freq_over_under["SurveyorsOverestimate"], ")"),
+                                             paste0("Surveyors Underestimate (n = ", freq_over_under["SurveyorsUnderestimate"], ")")
+                                             )) +
+  labs(title = "") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+png("RichnessError_DaysDifference.png", width = 25, height = 25, res = 300, units = "cm")
+p_richErr_Days
+dev.off()
+
+
+## Giovanni's suggestion:
+## mapping how error rates changes when you exclude comparisons with an increasing threshold of minimum time distance; 
+## in practice you first include all the data and quantify the errors; then you exclude all 
+## the points for which t-diff is = max(t diff); then exclude all the points for which t-diff is > (max(t diff)-1); 
+## then exclude all the points for which t-diff is > (max(t diff)-2) etc. until min(t diff). Each time you compute 
+## errors and then you plot errors in y axis and threshold in x axis.
+
+s_e_date_1
+s_e_date_1$diff_richness_fact
+summary(s_e_date_1$diff_richness_fact)
+summary(as.numeric(as.character(s_e_date_1$date_diff_fact)))
