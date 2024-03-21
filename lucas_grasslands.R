@@ -2929,7 +2929,203 @@ file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/dat
 
 
 
+## Minimum cell size for anonymization ####
 
+list.files("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs")
+
+expert_points <- paste0("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/GPKGs/estatdb_allattr_e_point.gpkg")
+
+expert_points <- st_read(expert_points)   # 605 points
+
+points_dist_mtx <- st_distance(expert_points)  # distance in meters
+points_dist_mtx
+View(points_dist_mtx)
+
+points_dist_pt <- as.vector(points_dist_mtx)
+sort(points_dist_pt)
+
+points_dist_pt[points_dist_pt == 0] <- NA
+sort(points_dist_pt)
+
+summary((unique(points_dist_pt)) / 1000)
+#    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+#    1988  751681 1243668 1319846 1846507 3782693     605 
+
+
+
+## raster grid ####
+
+# 1km 
+rast_1km <- rast("/eos/jeodpp/home/users/rotllxa/weeds/cropmap2018_maiz_1km.tif")
+rast_1km
+
+values(rast_1km) <- 1
+names(rast_1km) <- "rast_1km"
+rast_1km
+
+expert_points_laea <- st_transform(expert_points, crs = crs(rast_1km))
+expert_points_laea <- expert_points_laea["POINT_ID"]
+expert_points_laea
+
+
+cells(rast_1km, vect(expert_points_laea))
+head(cells(rast_1km, vect(expert_points_laea)))  # 'cell' is the cell number of the 1km raster  
+cell_nums <- cells(rast_1km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 605 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+#table(unique(cell_nums[, "cell"]))
+
+
+
+## 10 km
+
+rast_10km <- aggregate(rast_1km, fact = 10, fun = mean)
+rast_10km
+
+cell_nums <- cells(rast_10km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 577 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+unique(table(cell_nums[, "cell"]))
+
+
+## 20 km
+
+rast_20km <- aggregate(rast_1km, fact = 20, fun = mean)
+rast_20km
+
+cell_nums <- cells(rast_20km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 529 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 528
+sum(table(cell_nums[, "cell"]) >= 4) # 3
+
+
+
+## 50 km
+rast_50km <- aggregate(rast_1km, fact = 50, fun = mean)
+rast_50km
+
+cell_nums <- cells(rast_50km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 362 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 339
+sum(table(cell_nums[, "cell"]) >= 4) # 23
+
+
+## 100 km
+rast_100km <- aggregate(rast_1km, fact = 100, fun = mean)
+rast_100km
+
+cell_nums <- cells(rast_100km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 214 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 160
+sum(table(cell_nums[, "cell"]) >= 4) # 54
+
+
+
+## 200 km
+rast_200km <- aggregate(rast_1km, fact = 200, fun = mean)
+rast_200km
+
+cell_nums <- cells(rast_200km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 105 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 50
+sum(table(cell_nums[, "cell"]) >= 4) # 55
+
+
+## 250 km
+rast_250km <- aggregate(rast_1km, fact = 250, fun = mean)
+rast_250km
+
+cell_nums <- cells(rast_250km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 81 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 25
+sum(table(cell_nums[, "cell"]) >= 4) # 56
+
+
+
+## 300 km
+rast_300km <- aggregate(rast_1km, fact = 300, fun = mean)
+rast_300km
+
+cell_nums <- cells(rast_300km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 64 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 17
+sum(table(cell_nums[, "cell"]) >= 4) # 47
+
+
+## 400 km
+rast_400km <- aggregate(rast_1km, fact = 400, fun = mean)
+rast_400km
+
+cell_nums <- cells(rast_400km, vect(expert_points_laea))
+head(cell_nums)
+
+length(unique(cell_nums[, "cell"]))  # 45 is the number of points; while length of unique cell
+                                     # numbers is 605, only 1 point per cell (we need at least 4)
+table(cell_nums[, "cell"])
+sort(unique(table(cell_nums[, "cell"])))
+sum(table(cell_nums[, "cell"]) < 4)  # 8
+sum(table(cell_nums[, "cell"]) >= 4) # 37
+
+
+
+## by NUTS3 / NUTS0 ####
+
+# NUTS 3
+expert_points
+names(expert_points)
+
+sort(table(expert_points$nuts3))
+sort(unique(table(expert_points$nuts3)))
+
+sum(table(expert_points$nuts3) < 4)  # 222
+sum(table(expert_points$nuts3) >= 4) #  43
+
+
+# NUTS 0
+
+sort(table(expert_points$NUTS0))
+# NL DK IE LT EE LV BE FI SK CZ SI UK AT HR HU CY PL SE DE IT BG ES FR EL RO 
+#  2  4  4  4  5  6  7  7  7  8  8 12 13 15 15 20 26 29 36 37 44 53 68 82 93 
+
+sort(unique(table(expert_points$NUTS0)))
+
+sum(table(expert_points$NUTS0) < 4)  # 1
+sum(table(expert_points$NUTS0) >= 4) #  24
 
 
 
