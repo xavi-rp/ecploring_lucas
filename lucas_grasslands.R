@@ -21,7 +21,8 @@ if(Sys.info()[4] == "D01RI1700308") {
   wd <- "D:/xavi_rp/D5_FFGRCC_lucas_grasslands/"
 }else if(Sys.info()[4] == "S-JRCIPRAP320P") {
   wd <- "D:/rotllxa/D5_FFGRCC_lucas_grasslands/"
-}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12", "jeodpp-terminal-jd002-03" )) {
+}else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12", 
+                              "jeodpp-terminal-jd002-03", "jeodpp-terminal-jd004-03.cidsn.jrc.it")) {
   if(!dir.exists("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")) 
     dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")
   wd <- "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/"
@@ -748,6 +749,13 @@ nrow(releve_data_kk)
 ncol(releve_data_kk)
 
 unique(releve_data_kk$`26521776`)  # need to understand what 0.1, 0.2, 1.75, etc mean
+sort(unique(as.vector(unlist(releve_data_kk[, 3:ncol(releve_data_kk)]))))
+table(as.vector(unlist(releve_data_kk[, 3:ncol(releve_data_kk)])))
+# From Laura: "Cover is recorded as % of the total plot area. Values below 1% are 
+# recorded as "<1". Values below 1 should be corrected to <1, values above 1 
+# should be rounded to the nearest whole number, and I suspect that <2 is a typo 
+# and should have been <1"
+
 
 all_vals <- c()
 for(i in 3:ncol(releve_data_kk)){
@@ -2601,7 +2609,6 @@ dev.off()
 
 ## scatter richness error (surveyor vs expert) against date difference 
 
-<<<<<<< HEAD
 s_e_date
 head(s_e_date)
 
@@ -2711,24 +2718,152 @@ p_richErr_Days
 dev.off()
 
 
+### Mapping errors against date difference ####
 ## Giovanni's suggestion:
 ## mapping how error rates changes when you exclude comparisons with an increasing threshold of minimum time distance; 
 ## in practice you first include all the data and quantify the errors; then you exclude all 
 ## the points for which t-diff is = max(t diff); then exclude all the points for which t-diff is > (max(t diff)-1); 
 ## then exclude all the points for which t-diff is > (max(t diff)-2) etc. until min(t diff). Each time you compute 
 ## errors and then you plot errors in y axis and threshold in x axis.
+## You can compute over an underestimation separately (missing presences expert vs standard surveys, or "false" 
+## presences in std vs expert surveys) or an overall error measure. For each site, you will have two binary vectors 
+## of length 20 indicating presence absence of indicator taxa in either standard vs expert surveys. 
+## Call them v1=(0,1,0,0,1...) and v2 = (1,0,1,1,...). The score could be sum(abs(v1-v2))/20.
 
 s_e_date_1
+View(s_e_date_1)
 s_e_date_1$diff_richness_fact
 summary(s_e_date_1$diff_richness_fact)
 summary(as.numeric(as.character(s_e_date_1$date_diff_fact)))
-=======
+
+
+
+
+## Checking only richness difference by progressively decreasing difference of days
+
+s_e_date_1 <- s_e_date_1[, date_diff_abs := abs(date_diff)]
+s_e_date_1
+
+
+max(abs(s_e_date_1$date_diff))
+range(abs(s_e_date_1$date_diff))
+
+
+err_df <- data.frame()
+
+for(i in 0:max(abs(s_e_date_1$date_diff))){
+  
+  ii <- max(abs(s_e_date_1$date_diff)) - i
+  
+  s_e_date_1_i <- mean(abs(unlist(s_e_date_1[s_e_date_1$date_diff_abs <= ii, "diff_richness"])))
+  if(is.nan(s_e_date_1_i)) s_e_date_1_i <- NA
+  print(paste0(ii, ": ", s_e_date_1_i))
+  
+  err_df <- rbind(err_df, c(ii, s_e_date_1_i))
+}
+
+
+names(err_df) <- c("Days_difference", "Richness_error")
+err_df
+
+
+ggplot(err_df,
+       aes(x = Days_difference, y = Richness_error)) + 
+  geom_point() +
+  theme_light() +
+  labs(title = "") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 
 
 
 
+## Taking into account the key species (not only species richness)
 
+v1 <- round(runif(n = 20, min = 0, max = 1), 0)
+v2 <- round(runif(n = 20, min = 0, max = 1), 0)
+v1; v2
+
+err <- sum(abs(v1 - v2)) / 20
+err
+#
+
+point_geom_experts[, .SD, .SDcol = c("POINT_ID", "NUMBER_KEY_SPECIES")]
+ncol(point_geom_experts[, .SD, .SDcol = c("POINT_ID", names(point_geom_experts)[grep("SURVEY_GRASS_RICHNESS", names(point_geom_experts))])])
+
+key_experts <- point_geom_experts[, .SD, .SDcol = grep("SURVEY_GRASS_RICHNESS", names(point_geom_experts))]
+key_experts
+apply(key_experts, 1, function(x) sum(is.na(x)))
+
+
+key_experts <- point_geom_experts[, .SD, .SDcol = c("POINT_ID", names(point_geom_experts)[grep("SURVEY_GRASS_RICHNESS", names(point_geom_experts))])]
+key_experts <- key_experts[POINT_ID %in% s_e_date_1$POINT_ID, ]
+key_experts_ids <- key_experts$POINT_ID
+key_experts[key_experts > 0 , ] <- 1
+key_experts$POINT_ID <- key_experts_ids
+key_experts
+
+key_surveyors <- point_geom_surveyors[, .SD, .SDcol = c("POINT_ID", names(point_geom_surveyors)[grep("SURVEY_GRASS_RICHNESS", names(point_geom_surveyors))])]
+key_surveyors <- key_surveyors[POINT_ID %in% s_e_date_1$POINT_ID, ]
+key_surveyors_ids <- key_surveyors$POINT_ID
+key_surveyors[key_surveyors > 0 , ] <- 1
+key_surveyors$POINT_ID <- key_surveyors_ids
+
+key_surveyors
+
+identical(key_experts$POINT_ID, key_surveyors$POINT_ID)
+
+
+
+err <- c()
+
+for(i in 1:nrow(key_experts)){
+  
+  err_i <- sum(abs(key_surveyors[i, -1] - key_experts[i, -1]), na.rm = TRUE) / 20
+  err <- c(err, err_i)
+  
+}
+
+err
+range(err)
+
+
+err_df_1 <- data.frame(POINT_ID = key_experts$POINT_ID, Error = err)
+
+err_df_1 <- merge(s_e_date_1[, .SD, .SDcols = c("POINT_ID", "date_diff_abs")], err_df_1, by = "POINT_ID")
+err_df_1
+
+
+
+err_df_1_1 <- data.frame()
+
+for(i in 0:max(abs(err_df_1$date_diff_abs))){
+  
+  ii <- max(abs(err_df_1$date_diff_abs)) - i
+  
+  s_e_date_1_i <- mean(abs(unlist(err_df_1[err_df_1$date_diff_abs <= ii, "Error"])))
+  if(is.nan(s_e_date_1_i)) s_e_date_1_i <- NA
+  print(paste0(ii, ": ", s_e_date_1_i))
+  
+  err_df_1_1 <- rbind(err_df_1_1, c(ii, s_e_date_1_i))
+}
+
+
+names(err_df_1_1) <- c("Days_difference", "Error")
+err_df_1_1
+
+
+ggplot(err_df_1_1,
+       aes(x = Days_difference, y = Error)) + 
+  geom_point() +
+  theme_light() +
+  labs(title = "") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+#
 
 
 
@@ -2798,4 +2933,4 @@ file.copy(from = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/dat
 
 
 
->>>>>>> 28315b09a45e60c9486e3be5ffd80928b2520886
+
