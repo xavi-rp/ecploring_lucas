@@ -22,7 +22,8 @@ if(Sys.info()[4] == "D01RI1700308") {
 }else if(Sys.info()[4] == "S-JRCIPRAP320P") {
   wd <- "D:/rotllxa/D5_FFGRCC_lucas_grasslands/"
 }else if(Sys.info()[4] %in% c("jeodpp-terminal-jd001-03", "jeodpp-terminal-03", "jeodpp-terminal-dev-12", 
-                              "jeodpp-terminal-jd002-03", "jeodpp-terminal-jd004-03.cidsn.jrc.it")) {
+                              "jeodpp-terminal-jd002-03", "jeodpp-terminal-jd004-03.cidsn.jrc.it",
+                              "jeodpp-terminal-jd001-03.cidsn.jrc.it" )) {
   if(!dir.exists("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")) 
     dir.create("/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/")
   wd <- "/eos/jeodpp/home/users/rotllxa/lucas_grassland_data/"
@@ -2953,7 +2954,7 @@ summary((unique(points_dist_pt)) / 1000)
 
 
 
-## raster grid ####
+### raster grid ####
 
 # 1km 
 rast_1km <- rast("/eos/jeodpp/home/users/rotllxa/weeds/cropmap2018_maiz_1km.tif")
@@ -3103,7 +3104,7 @@ sum(table(cell_nums[, "cell"]) >= 4) # 37
 
 
 
-## by NUTS3 / NUTS0 ####
+### by NUTS3 / NUTS0 ####
 
 # NUTS 3
 expert_points
@@ -3128,5 +3129,144 @@ sum(table(expert_points$NUTS0) < 4)  # 1
 sum(table(expert_points$NUTS0) >= 4) #  24
 
 
+
+### Anonymising ####
+
+# final data sets to be published:
+anonym_dir <- "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/anonymised/"
+
+## Releve
+releve_data_all <- fread("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/releve_data_all.csv",
+                         header = TRUE)
+names(releve_data_all)
+head(names(releve_data_all))
+# No need to be anonymised, the column names are the POINT_ID
+
+if(!file.exists(paste0(anonym_dir, "LUCAS_G_2018_RELEVE/CSVs/")))
+   dir.create(paste0(anonym_dir, "LUCAS_G_2018_RELEVE/CSVs/"), recursive = TRUE)
+
+fs::file_copy(path = "/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_RELEVE/CSVs/releve_data_all.csv",
+          new_path = paste0(anonym_dir, "LUCAS_G_2018_RELEVE/CSVs/", "releve_data_all.csv"), 
+          overwrite = FALSE)
+
+
+## Key species
+
+estat_e_attr_point_allattr_new <- fread("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/estat_e_attr_point_allattr_new.csv",
+                                        header = TRUE)
+names(estat_e_attr_point_allattr_new)
+unique(estat_e_attr_point_allattr_new$SURVEY_GRASS_GPS_LAT)
+unique(estat_e_attr_point_allattr_new$SURVEY_GRASS_GPS_EW)
+unique(estat_e_attr_point_allattr_new$distanceToTHLOC)
+unique(estat_e_attr_point_allattr_new$GPS_STATUS)
+unique(estat_e_attr_point_allattr_new$POINT_GRASS_REGION)
+unique(estat_e_attr_point_allattr_new$POINT_GRASS_REGION_NAME)
+unique(estat_e_attr_point_allattr_new$AREACODE)
+unique(estat_e_attr_point_allattr_new$ALT_CLASS)
+unique(estat_e_attr_point_allattr_new$NUTS0)
+sum(is.na(estat_e_attr_point_allattr_new$NUTS0))
+unique(estat_e_attr_point_allattr_new$SURVEY_GRASS_TRNSCT_START)
+sum(is.na(estat_e_attr_point_allattr_new$SURVEY_GRASS_TRNSCT_START))
+unique(estat_e_attr_point_allattr_new$SURVEY_GRASS_TRNSCT_SHIFT)
+unique(estat_e_attr_point_allattr_new$SURVEY_GRASS_TRNSCT_SHIFT_DIST)
+unique(estat_e_attr_point_allattr_new$SURVEY_GRASS_TRNSCT_DIRECTION)
+
+names2remove <- c("SURVEY_GRASS_GPS_LAT", "SURVEY_GRASS_GPS_LON", "distanceToTHLOC",
+                  "SURVEY_GRASS_TRNSCT_SHIFT", "SURVEY_GRASS_TRNSCT_SHIFT_DIST", 
+                  "SURVEY_GRASS_TRNSCT_DIRECTION", 
+                  "GPS_STATUS", "POINT_ALTITUDE", "nuts3")
+
+
+estat_e_attr_point_allattr_new_anonym <- estat_e_attr_point_allattr_new %>%
+  select(!names2remove) #%>% 
+
+names(estat_e_attr_point_allattr_new_anonym)
+
+# country centroids
+eur_gisco <- gisco_get_countries(region = "Europe")
+eur_gisco <- st_crop(eur_gisco, xmin = -10.5, xmax = 32, ymin = 33, ymax = 70)
+eur_gisco
+
+eur_gisco_centr <- st_centroid(eur_gisco[1])
+eur_gisco_centr
+
+#ggplot() +
+#  geom_sf(data = eur_gisco, fill = "grey77") +
+#  geom_sf(data = eur_gisco_centr)
+
+eur_gisco_centr <- st_coordinates(eur_gisco_centr)
+
+eur_gisco_1 <- data.table(eur_gisco)
+eur_gisco_1 <- cbind(eur_gisco_1, eur_gisco_centr)
+eur_gisco_1 <- select(eur_gisco_1, c("CNTR_ID", "X", "Y"))
+
+
+estat_e_attr_point_allattr_new_anonym <- merge(estat_e_attr_point_allattr_new_anonym, 
+                                               eur_gisco_1,
+                                               all.x = TRUE,
+                                               by.x = "NUTS0", by.y = "CNTR_ID")
+
+
+
+if(!file.exists(paste0(anonym_dir, "LUCAS_G_2018_KEYSPECIES/CSVs/")))
+  dir.create(paste0(anonym_dir, "LUCAS_G_2018_KEYSPECIES/CSVs/"), recursive = TRUE)
+
+
+write.csv(estat_e_attr_point_allattr_new_anonym,
+          paste0(anonym_dir, "LUCAS_G_2018_KEYSPECIES/CSVs/", "estat_e_attr_point_allattr_new_anonym.csv"),
+          row.names = FALSE)                                        
+
+#
+
+estat_s_attr_point_allattr_new <- fread("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_KEYSPECIES/CSVs/estat_s_attr_point_allattr_new.csv",
+                                        header = TRUE)
+
+estat_s_attr_point_allattr_new_anonym <- estat_s_attr_point_allattr_new %>%
+  select(!names2remove) #%>% 
+
+names(estat_s_attr_point_allattr_new_anonym)
+
+
+estat_s_attr_point_allattr_new_anonym <- merge(estat_s_attr_point_allattr_new_anonym, 
+                                               eur_gisco_1,
+                                               all.x = TRUE,
+                                               by.x = "NUTS0", by.y = "CNTR_ID")
+
+
+write.csv(estat_s_attr_point_allattr_new_anonym,
+          paste0(anonym_dir, "LUCAS_G_2018_KEYSPECIES/CSVs/", "estat_s_attr_point_allattr_new_anonym.csv"),
+          row.names = FALSE)                                        
+
+
+#
+
+
+
+
+
+
+
+
+
+## Record descriptor ####
+# l2018_gr_recordDescriptor_onlyRelevantVars_full_nonas.csv
+record_descriptor <- read_csv("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/l2018_gr_recordDescriptor_onlyRelevantVars_full_nonas.csv")
+head(record_descriptor)
+names(record_descriptor)
+nrow(record_descriptor)
+
+
+LUCAS_Master_Grid <- read.csv("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS-Master-Grid.csv")
+names(LUCAS_Master_Grid)
+nrow(LUCAS_Master_Grid)
+
+
+LUCAS_2018_Gr_all_EXIF <- read.csv("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_EXIF/LUCAS_2018_Gr_all_EXIF.csv")
+names(LUCAS_2018_Gr_all_EXIF)
+nrow(LUCAS_2018_Gr_all_EXIF)
+unique(LUCAS_2018_Gr_all_EXIF$GPSLatitude)
+
+
+surveyorDF_exif <- read.csv("/eos/jeodpp/data/projects/REFOCUS/data/LUCAS2018_Grassland/data/LUCAS_G_2018_EXIF/surveyorDF_exif.csv")
 
 
